@@ -151,8 +151,8 @@ Idle → (플레이어 감지) Chase → (공격 거리 진입) Attack
 | ID | 카드 범주 / 인스턴스 | 실제 세부 정의 | 상태 | 연결·적용 계획 |
 |---|---|---|---|---|
 | C-01 | `NumberCardInstance` | ×, ÷, +, − / Integer, Decimal, Wild | 현행 생성, 타입 분리 예정 | 반드시 연산자와 수치 둘 다 보유 |
-| C-02 | `PhysicsCardInstance` | MoveSpeed, JumpForce, GravityScale, Friction, Bounciness | 현행 일부 적용, 타입 분리 예정 | 숫자 연산 체인에 연결 |
-| C-03 | `StatCardInstance` | MaxHealth, AttackPower, Defense | CardData 정의됨, 효과 미완성 | 숫자 연산 체인에 연결 |
+| C-02 | `PhysicsCardInstance` | MoveSpeed, JumpForce, GravityScale, Friction, Bounciness | 현행 일부 적용, 타입 분리 예정 | 숫자 연산 체인을 연결 |
+| C-03 | `StatCardInstance` | MaxHealth, AttackPower, Defense | CardData 정의됨, 효과 미완성 | 숫자 연산 체인을 연결 |
 | C-04 | `SpecialCardInstance` | DoubleJump, InvincibilityTime | CardData 정의됨, 카드 풀 미등록 | 연결·중첩 정책 미정 |
 | C-05 | `TargetCardInstance` | Player, Enemy | 예정 | `EnemyTarget → GravityScale → ×2` 같은 앞쪽 주체 카드 |
 
