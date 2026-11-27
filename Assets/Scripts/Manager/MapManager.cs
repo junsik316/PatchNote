@@ -67,21 +67,34 @@ public class MapManager : MonoBehaviour
         Vector3 startPos =
             roomMaker.GenerateRoom(currentNode);
 
+
         GameObject playerObject = Instantiate(
-    playerPrefab,
-    startPos,
-    Quaternion.identity
-);
+            playerPrefab,
+            startPos,
+            Quaternion.identity
+        );
 
         Playercontroller spawnedPlayer =
             playerObject.GetComponent<Playercontroller>();
 
         GameManager.Instance.RegisterPlayer(spawnedPlayer);
 
-        if (GameManager.Instance.Player != null)
+        if (spawnedPlayer != null)
         {
-            GameManager.Instance.Player.cardManager = cardManager;
+            spawnedPlayer.cardManager = cardManager;
         }
+
+        // 누락되었던 초기화 복원
+        SpawnCurrentRoomEnemies();
+
+        if (mapMaker != null)
+        {
+            mapMaker.GenerateMapUI(
+                mapNodes,
+                currentNode
+            );
+        }
+
     }
 
     // 방에 들어갈 때 클리어 기록 복원
