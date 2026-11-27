@@ -1,101 +1,173 @@
-
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class InventoryUI : MonoBehaviour
 {
-    [Header("ÀÎº¥Åä¸® UI")]
+    [Header("ì¸ë²¤í† ë¦¬ UI")]
     public GameObject inventoryPanel;
-
     public GameObject inventoryCardPrefab;
     public GameObject combinedCardPrefab;
-
     public Transform cardContainer;
     public RectTransform dragLayer;
 
-    [Header("Á¶ÇÕ °ü¸®")]
+    [Header("ì¡°í•© ê´€ë¦¬")]
     public CardCombinationManager combinationManager;
 
-    private List<InventoryCardUI> displayedCards =
+    private readonly List<InventoryCardUI> displayedCards =
         new List<InventoryCardUI>();
-
-    private Dictionary<CardInstance, InventoryCardUI> uiDictionary =
-        new Dictionary<CardInstance, InventoryCardUI>();
-
-    
-
     private List<CardInstance> inventoryData;
     private bool needsRefresh;
 
     public InventoryCardUI CurrentDraggingCard { get; private set; }
+    public bool IsOpen => inventoryPanel != null && inventoryPanel.activeSelf;
 
-    public bool IsOpen => inventoryPanel.activeSelf;
-
-    // ÀÎº¥Åä¸® ¿­±â
     public void OpenInventory(List<CardInstance> inventory)
     {
+        if (inventoryPanel == null || cardContainer == null)
+        {
+            Debug.LogError("InventoryUI: ì¸ë²¤í† ë¦¬ íŒ¨ë„ ë˜ëŠ” ì¹´ë“œ ì˜ì—­ì´ ì—†ìŠµë‹ˆë‹¤.", this);
+            return;
+        }
+
         inventoryData = inventory;
-
-        RefreshInventory();
-
         inventoryPanel.SetActive(true);
+        ConfigureLayout();
+        RefreshInventory();
     }
 
     public void CloseInventory()
     {
-        inventoryPanel.SetActive(false);
+        if (inventoryPanel != null)
+            inventoryPanel.SetActive(false);
     }
 
-    // Ä«µå UI »ı¼º ¹× ¿¬°á °ü°è º¹¿ø
+    // The prefab used GridLayoutGroup with fixed 100x100 cells. Scratch
+    // chains have different heights, so use a vertical list instead.
+    private void ConfigureLayout()
+    {
+        if (cardContainer == null)
+            return;
+
+        GridLayoutGroup grid = cardContainer.GetComponent<GridLayoutGroup>();
+        if (grid != null)
+            grid.enabled = false;
+
+        HorizontalLayoutGroup horizontal =
+            cardContainer.GetComponent<HorizontalLayoutGroup>();
+        if (horizontal != null)
+            horizontal.enabled = false;
+
+        VerticalLayoutGroup column =
+            cardContainer.GetComponent<VerticalLayoutGroup>();
+        if (column == null)
+            column = cardContainer.gameObject.AddComponent<VerticalLayoutGroup>();
+
+        column.padding = new RectOffset(12, 12, 12, 12);
+        column.spacing = 12f;
+        column.childAlignment = TextAnchor.UpperCenter;
+        column.childControlWidth = false;
+        column.childControlHeight = true;
+        column.childForceExpandWidth = false;
+        column.childForceExpandHeight = false;
+
+        RectTransform rect = cardContainer as RectTransform;
+        if (rect != null)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(18f, 18f);
+            rect.offsetMax = new Vector2(-18f, -18f);
+        }
+    }
+
     private void RefreshInventory()
     {
-        foreach (InventoryCardUI ui in displayedCards)
-            Destroy(ui.gameObject);
+        if (CurrentDraggingCard != null)
+        {
+            needsRefresh = true;
+            return;
+        }
 
+        foreach (InventoryCardUI ui in displayedCards)
+        {
+            if (ui == null)
+                continue;
+
+            // Remove the old items from layout immediately.
+            ui.gameObject.SetActive(false);
+            Destroy(ui.gameObject);
+        }
         displayedCards.Clear();
 
-        if (inventoryData == null)
+        if (inventoryData == null || cardContainer == null)
             return;
 
         foreach (CardInstance instance in inventoryData)
         {
-            // ´Ù¸¥ Ä«µå¿¡ ¼Ò¼ÓµÈ Ä«µå´Â µû·Î »ı¼ºÇÏÁö ¾ÊÀ½
-            if (instance.parentCard != null)
+            if (instance == null || instance.parentCard != null)
                 continue;
 
-            // ÀÚ½Ä Ä«µå°¡ ÀÖ´Ù¸é ÇÕ¼º Ä«µå·Î Ç¥½Ã
-            bool isCombined = instance.childCard != null;
-
-            GameObject prefab = isCombined
-                ? combinedCardPrefab
-                : inventoryCardPrefab;
+            bool combined = instance.childCard != null;
+            GameObject prefab = combined ? combinedCardPrefab : inventoryCardPrefab;
+            if (prefab == null)
+            {
+                Debug.LogError("ì¸ë²¤í† ë¦¬ ì¹´ë“œ í”„ë¦¬íŒ¹ì´ ì„¤ì •ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.", this);
+                continue;
+            }
 
             GameObject obj = Instantiate(prefab, cardContainer);
-
-            InventoryCardUI ui =
-                obj.GetComponent<InventoryCardUI>();
+            InventoryCardUI ui = obj.GetComponent<InventoryCardUI>();
+            if (ui == null)
+            {
+                Debug.LogError("ì¹´ë“œ í”„ë¦¬íŒ¹ì— InventoryCardUIê°€ ì—†ìŠµë‹ˆë‹¤.", obj);
+                Destroy(obj);
+                continue;
+            }
 
             ui.SetCard(instance, this);
-            displayedCards.Add(ui);
-
-            if (isCombined)
+            if (combined)
             {
-                CombinedCardUI combinedUI =
-                    obj.GetComponent<CombinedCardUI>();
-
-                combinedUI.SetCard(instance, this);
+                CombinedCardUI combinedUI = obj.GetComponent<CombinedCardUI>();
+                if (combinedUI != null)
+                    combinedUI.SetCard(instance, this);
+                else
+                    Debug.LogError("í•©ì„± ì¹´ë“œ í”„ë¦¬íŒ¹ì— CombinedCardUIê°€ ì—†ìŠµë‹ˆë‹¤.", obj);
             }
+
+            int length = combined ? CombinedCardUI.CountChain(instance) : 1;
+            float height = combined
+                ? CombinedCardUI.ChainHeight(length)
+                : ScratchBlockGraphic.BlockHeight;
+
+            RectTransform rect = obj.transform as RectTransform;
+            if (rect != null)
+                rect.sizeDelta = new Vector2(270f, height);
+
+            LayoutElement element = obj.GetComponent<LayoutElement>();
+            if (element == null)
+                element = obj.AddComponent<LayoutElement>();
+            element.minWidth = 200f;
+            element.preferredWidth = 270f;
+            element.preferredHeight = height;
+            element.flexibleHeight = 0f;
+
+            displayedCards.Add(ui);
         }
+
+        if (cardContainer is RectTransform containerRect)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(containerRect);
     }
+
     public void BeginDrag(InventoryCardUI card)
     {
-        CurrentDraggingCard = card;
+        if (CurrentDraggingCard == null)
+            CurrentDraggingCard = card;
     }
 
     public void EndDrag()
     {
         CurrentDraggingCard = null;
-
         if (needsRefresh)
         {
             needsRefresh = false;
@@ -103,51 +175,61 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
-    // Ä«µå ¿¬°á
-    public void TryConnect(
-    InventoryCardUI parentUI,
-    InventoryCardUI childUI)
+    public void TryConnect(InventoryCardUI parentUI, InventoryCardUI childUI)
     {
-        CardInstance parent = parentUI.CardInstance;
-        CardInstance child = childUI.CardInstance;
+        if (parentUI == null || childUI == null ||
+            parentUI == childUI || combinationManager == null)
+            return;
 
-        // ÇÕ¼º Ä«µå¶ó¸é ¸¶Áö¸· Ä«µå±îÁö ÀÌµ¿
-        while (parent.childCard != null)
-            parent = parent.childCard;
+        CardInstance tail = parentUI.CardInstance;
+        CardInstance childRoot = childUI.CardInstance;
+        if (tail == null || childRoot == null ||
+            childRoot.parentCard != null || inventoryData == null ||
+            !inventoryData.Contains(tail) || !inventoryData.Contains(childRoot))
+            return;
 
-        bool success = combinationManager.TryConnect(parent, child);
-
-        if (!success)
+        var visited = new HashSet<CardInstance>();
+        while (tail.childCard != null)
         {
-            Debug.Log("À¯È¿ÇÏÁö ¾ÊÀº Ä«µå Á¶ÇÕÀÔ´Ï´Ù.");
+            if (!visited.Add(tail))
+            {
+                Debug.LogWarning("ë¶€ëª¨ ì¹´ë“œ ì²´ì¸ì— ìˆœí™˜ì´ ìˆìŠµë‹ˆë‹¤.");
+                return;
+            }
+            tail = tail.childCard;
+        }
+
+        if (!combinationManager.TryConnect(tail, childRoot))
+        {
+            Debug.Log("ìœ íš¨í•˜ì§€ ì•Šì€ ì¹´ë“œ ì¡°í•©ì…ë‹ˆë‹¤.");
             return;
         }
 
-        // ¿¬°á ¼º°ø ÈÄ ¹°¸® °è¼ö °»½Å
-        GameManager.Instance.uiManager.RecalculatePhysicsCoefficients();
-
-       
-        // µå·¡±× Á¾·á ÈÄ UI °»½Å
-        needsRefresh = true;
+        RecalculateEffects();
+        if (CurrentDraggingCard != null)
+            needsRefresh = true;
+        else
+            RefreshInventory();
     }
 
-    // Ä«µå ¿¬°á ÇØÁ¦
     public void DisconnectCard(CardInstance child)
     {
-        if (child == null || child.parentCard == null)
+        if (child == null || child.parentCard == null ||
+            combinationManager == null)
             return;
 
         combinationManager.Disconnect(child);
-
-        // ¿¬°á ÇØÁ¦ ÈÄ ¹°¸® °è¼ö ´Ù½Ã °è»ê
-        GameManager.Instance.uiManager.RecalculatePhysicsCoefficients();
-
-        RefreshInventory();
+        RecalculateEffects();
+        if (CurrentDraggingCard != null)
+            needsRefresh = true;
+        else
+            RefreshInventory();
     }
 
-    // ÇöÀç UI¿¡ µî·ÏµÈ Ä«µå ¸ñ·Ï ¹İÈ¯
-    private List<CardInstance> GetInventoryList()
+    private void RecalculateEffects()
     {
-        return new List<CardInstance>(uiDictionary.Keys);
+        if (GameManager.Instance != null &&
+            GameManager.Instance.uiManager != null)
+            GameManager.Instance.uiManager.RecalculatePhysicsCoefficients();
     }
 }

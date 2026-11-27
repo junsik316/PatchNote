@@ -112,7 +112,10 @@ public class CombinedBlockUI : MonoBehaviour
 
             Image unlinkImage = unlinkButton.GetComponent<Image>();
             if (unlinkImage != null)
+            {
                 unlinkImage.color = new Color(0.08f, 0.10f, 0.16f, 0.8f);
+                unlinkImage.raycastTarget = true;
+            }
 
             TMP_Text buttonLabel = unlinkButton.GetComponentInChildren<TMP_Text>(true);
             if (buttonLabel != null)
@@ -121,6 +124,16 @@ public class CombinedBlockUI : MonoBehaviour
                 buttonLabel.fontSize = 22f;
                 buttonLabel.alignment = TextAlignmentOptions.Center;
                 buttonLabel.raycastTarget = false;
+            }
+            else
+            {
+                Text legacyLabel = unlinkButton.GetComponentInChildren<Text>(true);
+                if (legacyLabel != null)
+                {
+                    legacyLabel.text = "×";
+                    legacyLabel.alignment = TextAnchor.MiddleCenter;
+                    legacyLabel.raycastTarget = false;
+                }
             }
         }
     }
