@@ -1,19 +1,18 @@
-
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.UI;
 
 public class CombinedBlockUI : MonoBehaviour
 {
-    [Header("ºí·Ï UI")]
+    [Header("ë¸”ë¡ UI")]
     public Image background;
     public Image cardIcon;
     public Text cardName;
     public Button unlinkButton;
 
-    [Header("ÀÚ½Ä ºí·Ï ¿µ¿ª")]
+    [Header("ìžì‹ ë¸”ë¡ ì˜ì—­")]
     public Transform childSlot;
 
-    [Header("Ä«µå Á¾·ùº° »ö»ó")]
+    [Header("ì¹´ë“œ ì¢…ë¥˜ë³„ ìƒ‰ìƒ")]
     public Color numberColor = new Color(0.25f, 0.55f, 0.9f);
     public Color physicsColor = new Color(0.65f, 0.4f, 0.85f);
     public Color statColor = new Color(0.25f, 0.7f, 0.5f);
@@ -29,64 +28,41 @@ public class CombinedBlockUI : MonoBehaviour
         cardInstance = instance;
         inventoryUI = owner;
 
-        // Ä«µå Á¤º¸ Ç¥½Ã
         cardName.text = GetCardName(instance);
-
         if (cardIcon != null)
         {
             Sprite sprite = instance.cardData.cardImage;
-
             cardIcon.gameObject.SetActive(sprite != null);
-
             if (sprite != null)
                 cardIcon.sprite = sprite;
         }
 
-        // Ä«µå Á¾·ùº° »ö»ó
+        // ê¸°ì¡´ í”„ë¦¬íŒ¹ì˜ ìƒ‰ìƒ í•„ë“œ/ì°¸ì¡°ëŠ” ë³€ê²½í•˜ì§€ ì•ŠëŠ”ë‹¤.
         switch (instance.cardType)
         {
             case CardType.Number:
                 background.color = numberColor;
                 break;
-
             case CardType.Physics:
                 background.color = physicsColor;
                 break;
-
             case CardType.Stat:
                 background.color = statColor;
                 break;
+                // Special/Targetì˜ ìƒ‰ìƒì€ UI ì„¤ê³„ ë‹¨ê³„ì—ì„œ ì¶”ê°€.
         }
 
-        // ·çÆ® Ä«µå¿¡´Â ÇØÁ¦ ¹öÆ°ÀÌ ¾øÀ½
         bool canUnlink = instance.parentCard != null;
-
         unlinkButton.gameObject.SetActive(canUnlink);
         unlinkButton.onClick.RemoveAllListeners();
-
         if (canUnlink)
-        {
-            unlinkButton.onClick.AddListener(() =>
-            {
-                inventoryUI.DisconnectCard(cardInstance);
-            });
-        }
+            unlinkButton.onClick.AddListener(() => inventoryUI.DisconnectCard(cardInstance));
 
-        // ÀÚ½Ä Ä«µå°¡ ÀÖ´Ù¸é ºí·Ï ¾È¿¡ »ý¼º
         if (instance.childCard != null)
         {
             childSlot.gameObject.SetActive(true);
-
-            CombinedBlockUI childBlock = Instantiate(
-                blockPrefab,
-                childSlot
-            );
-
-            childBlock.SetBlock(
-                instance.childCard,
-                owner,
-                blockPrefab
-            );
+            CombinedBlockUI childBlock = Instantiate(blockPrefab, childSlot);
+            childBlock.SetBlock(instance.childCard, owner, blockPrefab);
         }
         else
         {
@@ -96,35 +72,27 @@ public class CombinedBlockUI : MonoBehaviour
 
     private string GetCardName(CardInstance instance)
     {
-        if (instance.cardType == CardType.Number)
+        if (instance is NumberCardInstance number)
         {
-            string op = instance.cardOperator.ToString();
-
-            switch (op)
+            string op;
+            switch (number.cardOperator)
             {
-                case "Multiply":
-                    op = "*";
-                    break;
-                case "Divide":
-                    op = "/";
-                    break;
-                case "Add":
-                    op = "+";
-                    break;
-                case "Subtract":
-                    op = "-";
-                    break;
+                case CardOperator.Multiply: op = "Ã—"; break;
+                case CardOperator.Divide: op = "Ã·"; break;
+                case CardOperator.Add: op = "+"; break;
+                case CardOperator.Subtract: op = "âˆ’"; break;
+                default: op = number.cardOperator.ToString(); break;
             }
-
-            return op + " " + instance.numberValue.ToString("0.##");
+            return op + " " + number.numberValue.ToString("0.##");
         }
-
-        if (instance.cardType == CardType.Physics)
-            return instance.physicsType;
-
-        if (instance.cardType == CardType.Stat)
-            return instance.statType;
-
+        if (instance is PhysicsCardInstance physics)
+            return physics.physicsType.ToString();
+        if (instance is StatCardInstance stat)
+            return stat.statType.ToString();
+        if (instance is SpecialCardInstance special)
+            return special.specialType.ToString();
+        if (instance is TargetCardInstance target)
+            return target.target.ToString();
         return instance.cardData.cardName;
     }
 }

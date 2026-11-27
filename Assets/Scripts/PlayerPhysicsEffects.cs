@@ -1,8 +1,9 @@
-
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+// 이번 단계에서는 기존 플레이어 물리 효과를 유지하기 위해
+// CardInstance 접근 부분만 파생 타입 기반으로 변경한다.
+// 계산기/적용기 분리는 다음 리팩터링 단계에서 수행한다.
 public class PlayerPhysicsEffects : MonoBehaviour
 {
     [Header("플레이어 물리 컴포넌트")]
@@ -13,21 +14,18 @@ public class PlayerPhysicsEffects : MonoBehaviour
     public float baseMoveSpeed = 5f;
     public float baseJumpForce = 10f;
 
-    // PlayerController가 실제로 사용할 값
     public float MoveSpeed { get; private set; }
     public float JumpForce { get; private set; }
 
     private float baseGravityScale;
     private float baseFriction;
     private float baseBounciness;
-
     private PhysicsMaterial2D runtimeMaterial;
 
     private void Awake()
     {
         if (rb == null)
             rb = GetComponent<Rigidbody2D>();
-
         if (bodyCollider == null)
             bodyCollider = GetComponent<Collider2D>();
 
@@ -40,51 +38,39 @@ public class PlayerPhysicsEffects : MonoBehaviour
 
         MoveSpeed = baseMoveSpeed;
         JumpForce = baseJumpForce;
-
         baseGravityScale = rb.gravityScale;
 
-        // 다른 오브젝트의 물리 재질이 바뀌지 않도록 복제
         if (bodyCollider != null)
         {
-            PhysicsMaterial2D original =
-                bodyCollider.sharedMaterial;
-
+            PhysicsMaterial2D original = bodyCollider.sharedMaterial;
             if (original != null)
             {
                 runtimeMaterial = Instantiate(original);
             }
             else
             {
-                runtimeMaterial = new PhysicsMaterial2D(
-                    "PlayerRuntimeMaterial"
-                );
-
+                runtimeMaterial = new PhysicsMaterial2D("PlayerRuntimeMaterial");
                 runtimeMaterial.friction = 0.4f;
                 runtimeMaterial.bounciness = 0f;
             }
 
             baseFriction = runtimeMaterial.friction;
             baseBounciness = runtimeMaterial.bounciness;
-
             bodyCollider.sharedMaterial = runtimeMaterial;
         }
     }
 
     private void Start()
     {
-        // 플레이어가 새로 생성되어도 카드 효과 적용
         if (GameManager.Instance != null &&
             GameManager.Instance.uiManager != null)
         {
-            Recalculate(
-                GameManager.Instance.uiManager.inventory
-            );
+            Recalculate(GameManager.Instance.uiManager.inventory);
         }
     }
 
     public void Recalculate(List<CardInstance> inventory)
     {
-        // 매번 기본값부터 다시 계산
         Dictionary<PhysicsType, float> values =
             new Dictionary<PhysicsType, float>()
             {
@@ -99,153 +85,87 @@ public class PlayerPhysicsEffects : MonoBehaviour
         {
             foreach (CardInstance root in inventory)
             {
-                if (root == null)
+                if (root == null || root.parentCard != null)
                     continue;
 
-                // 연결된 자식 카드는 따로 계산하지 않음
-                if (root.parentCard != null)
+                // 이전의 문자열 physicsType과 CardType 필드 대신
+                // 구체 타입에 저장된 enum 값을 직접 사용한다.
+                if (!(root is PhysicsCardInstance physicsCard))
                     continue;
 
-                // 물리 카드만 처리
-                if (root.cardType != CardType.Physics)
-                    continue;
-
-                // 문자열을 물리 대상 열거형으로 변환
-                if (!Enum.TryParse(
-                    root.physicsType,
-                    true,
-                    out PhysicsType target))
-                {
-                    Debug.LogWarning(
-                        "알 수 없는 물리 대상: " + root.physicsType
-                    );
-                    continue;
-                }
-
+                PhysicsType target = physicsCard.physicsType;
                 if (!values.ContainsKey(target))
                     continue;
 
-                float currentValue = values[target];
-
-                // 연결된 숫자 카드들을 차례대로 계산
-                currentValue = CalculateChain(
-                    root,
-                    currentValue
-                );
-
-                values[target] = currentValue;
+                values[target] = CalculateChain(root, values[target]);
             }
         }
 
-        // 최종 물리 계수 적용
-        MoveSpeed = Mathf.Max(
-            0f,
-            values[PhysicsType.MoveSpeed]
-        );
-
-        JumpForce = Mathf.Max(
-            0f,
-            values[PhysicsType.JumpForce]
-        );
-
-        rb.gravityScale = values[
-            PhysicsType.GravityScale
-        ];
+        MoveSpeed = Mathf.Max(0f, values[PhysicsType.MoveSpeed]);
+        JumpForce = Mathf.Max(0f, values[PhysicsType.JumpForce]);
+        rb.gravityScale = values[PhysicsType.GravityScale];
 
         if (runtimeMaterial != null)
         {
-            runtimeMaterial.friction = Mathf.Clamp01(
-                values[PhysicsType.Friction]
-            );
-
-            runtimeMaterial.bounciness = Mathf.Clamp01(
-                values[PhysicsType.Bounciness]
-            );
+            runtimeMaterial.friction = Mathf.Clamp01(values[PhysicsType.Friction]);
+            runtimeMaterial.bounciness = Mathf.Clamp01(values[PhysicsType.Bounciness]);
         }
 
         Debug.Log(
-            $"물리 계수 갱신: " +
-            $"Speed={MoveSpeed}, " +
-            $"Jump={JumpForce}, " +
-            $"Gravity={rb.gravityScale}"
+            $"물리 계수 갱신: Speed={MoveSpeed}, " +
+            $"Jump={JumpForce}, Gravity={rb.gravityScale}"
         );
     }
 
-    private float CalculateChain(
-        CardInstance root,
-        float initialValue)
+    private float CalculateChain(CardInstance root, float initialValue)
     {
         float result = initialValue;
-
-        HashSet<CardInstance> visited =
-            new HashSet<CardInstance>();
-
+        HashSet<CardInstance> visited = new HashSet<CardInstance>();
         visited.Add(root);
-
         CardInstance current = root.childCard;
 
         while (current != null)
         {
-            // 잘못 연결된 순환 구조 방지
             if (!visited.Add(current))
             {
                 Debug.LogWarning("카드 연결에 순환이 있습니다.");
                 break;
             }
 
-            if (current.cardType == CardType.Number)
-            {
-                result = ApplyNumberCard(
-                    result,
-                    current
-                );
-            }
+            if (current is NumberCardInstance numberCard)
+                result = ApplyNumberCard(result, numberCard);
 
             current = current.childCard;
         }
-
         return result;
     }
 
-    private float ApplyNumberCard(
-        float value,
-        CardInstance numberCard)
+    private float ApplyNumberCard(float value, NumberCardInstance numberCard)
     {
-        float number = (float)numberCard.numberValue;
-        float result = value;
+        float number = numberCard.numberValue;
+        float result;
 
-        // 기존 CardOperator의 이름 사용
-        string op = numberCard.cardOperator.ToString();
-
-        switch (op)
+        switch (numberCard.cardOperator)
         {
-            case "Multiply":
-            case "Multipy":
+            case CardOperator.Multiply:
                 result = value * number;
                 break;
-
-            case "Divide":
+            case CardOperator.Divide:
                 if (Mathf.Approximately(number, 0f))
                 {
                     Debug.LogWarning("0으로 나눌 수 없습니다.");
                     return value;
                 }
-
                 result = value / number;
                 break;
-
-            case "Add":
+            case CardOperator.Add:
                 result = value + number;
                 break;
-
-            case "Subtract":
+            case CardOperator.Subtract:
                 result = value - number;
                 break;
-
             default:
-                Debug.LogWarning(
-                    "지원하지 않는 연산자: " + op
-                );
+                Debug.LogWarning("지원하지 않는 연산자: " + numberCard.cardOperator);
                 return value;
         }
 
@@ -254,7 +174,6 @@ public class PlayerPhysicsEffects : MonoBehaviour
             Debug.LogWarning("유효하지 않은 물리 계산 결과입니다.");
             return value;
         }
-
         return result;
     }
 
