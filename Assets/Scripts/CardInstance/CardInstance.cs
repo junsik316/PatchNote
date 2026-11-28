@@ -1,7 +1,7 @@
 using System;
 
-// ±âÁ¸ Unity ¾ÀÀÇ CardCombinationManager ±ÔÄ¢ Á÷·ÄÈ­ È£È¯À» À§ÇØ À¯ÁöÇÑ´Ù.
-// CardInstance¿¡ ¿É¼ÇÀ» ÀúÀåÇÏÁö ¾Ê°í, ÆÄ»ı Å¬·¡½º°¡ Á¦°øÇÏ´Â ¿É¼ÇÀ» °è»êÇÑ´Ù.
+// ê¸°ì¡´ Unity ì”¬ì˜ CardCombinationManager ê·œì¹™ ì§ë ¬í™” í˜¸í™˜ì„ ìœ„í•´ ìœ ì§€í•œë‹¤.
+// CardInstanceì— ì˜µì…˜ì„ ì €ì¥í•˜ì§€ ì•Šê³ , íŒŒìƒ í´ë˜ìŠ¤ê°€ ì œê³µí•˜ëŠ” ì˜µì…˜ì„ ê³„ì‚°í•œë‹¤.
 [Flags]
 public enum CardOption
 {
@@ -14,7 +14,7 @@ public enum CardOption
     Target = 1 << 5
 }
 
-// ±âÁ¸ 0, 1, 2 °ªÀº ±×´ë·Î À¯ÁöÇÑ´Ù.
+// ê¸°ì¡´ 0, 1, 2 ê°’ì€ ê·¸ëŒ€ë¡œ ìœ ì§€í•œë‹¤.
 public enum CardType
 {
     Number = 0,
@@ -27,14 +27,14 @@ public enum CardType
 [Serializable]
 public abstract class CardInstance
 {
-    // »ı¼º¿¡ »ç¿ëµÈ ScriptableObject. ±âÁ¸ CardData´Â ±×´ë·Î »ç¿ëÇÑ´Ù.
+    // ìƒì„±ì— ì‚¬ìš©ëœ ScriptableObject. ê¸°ì¡´ CardDataëŠ” ê·¸ëŒ€ë¡œ ì‚¬ìš©í•œë‹¤.
     public CardData cardData;
 
-    // 1°³ÀÇ ºÎ¸ğ¿Í 1°³ÀÇ ÀÚ½ÄÀ» °®´Â ¼±Çü Ã¼ÀÎ.
-    public CardInstance parentCard;
-    public CardInstance childCard;
+    // 1ê°œì˜ ë¶€ëª¨ì™€ 1ê°œì˜ ìì‹ì„ ê°–ëŠ” ì„ í˜• ì²´ì¸.
+    [UnityEngine.SerializeReference] public CardInstance parentCard;
+    [UnityEngine.SerializeReference] public CardInstance childCard;
 
-    // º°µµ ÀúÀå ÇÊµå°¡ ¾Æ´Ñ ÆÄ»ı Å¸ÀÔÀ¸·ÎºÎÅÍ °è»êµÇ´Â ¼Ó¼º.
+    // ë³„ë„ ì €ì¥ í•„ë“œê°€ ì•„ë‹Œ íŒŒìƒ íƒ€ì…ìœ¼ë¡œë¶€í„° ê³„ì‚°ë˜ëŠ” ì†ì„±.
     public abstract CardType cardType { get; }
     public abstract CardOption ProvidedOptions { get; }
 
@@ -43,8 +43,8 @@ public abstract class CardInstance
         cardData = data;
     }
 
-    // ±âÁ¸ CardCombinationManagerÀÇ Inspector ±ÔÄ¢À» À¯ÁöÇÏ±â À§ÇÑ È£È¯ API.
-    // ÇÃ·¡±×°¡ ¿©·¯ °³¶ó¸é ¸ğµÎ ÃæÁ·ÇØ¾ß ÇÑ´Ù.
+    // ê¸°ì¡´ CardCombinationManagerì˜ Inspector ê·œì¹™ì„ ìœ ì§€í•˜ê¸° ìœ„í•œ í˜¸í™˜ API.
+    // í”Œë˜ê·¸ê°€ ì—¬ëŸ¬ ê°œë¼ë©´ ëª¨ë‘ ì¶©ì¡±í•´ì•¼ í•œë‹¤.
     public bool HasOption(CardOption options)
     {
         return options != CardOption.None &&
