@@ -34,13 +34,7 @@ public class CardManager : MonoBehaviour
         transform.SetParent(null, true);
         DontDestroyOnLoad(gameObject);
 
-        if (combinationManager == null)
-            combinationManager = FindFirstObjectByType<CardCombinationManager>();
-
-        if (combinationManager == null)
-            combinationManager = gameObject.AddComponent<CardCombinationManager>();
-        else if (combinationManager.transform != transform)
-            combinationManager.transform.SetParent(transform, true);
+        
     }
 
     private void Start()
@@ -217,7 +211,7 @@ public class CardManager : MonoBehaviour
         if (totalWeight <= 0f)
             return null;
 
-        float randomValue = Random.Range(0f, totalWeight);
+        float randomValue = UnityEngine.Random.Range(0f, totalWeight);
         float currentWeight = 0f;
         foreach (CardPoolEntry entry in cards)
         {
@@ -281,7 +275,7 @@ public class CardManager : MonoBehaviour
             Debug.LogError("Wild 카드에 허용된 연산자가 없습니다.");
             return CardOperator.None;
         }
-        return operators[Random.Range(0, operators.Count)];
+        return operators[UnityEngine.Random.Range(0, operators.Count)];
     }
 
     private float GenerateNumber(NumberCardData card)
@@ -300,7 +294,7 @@ public class CardManager : MonoBehaviour
                         Debug.LogError("정수 범위가 올바르지 않습니다.");
                         return min;
                     }
-                    return Random.Range(minInt, maxInt + 1);
+                    return UnityEngine.Random.Range(minInt, maxInt + 1);
                 }
             case CardNumber.Decimal:
             case CardNumber.Wild:
@@ -312,7 +306,7 @@ public class CardManager : MonoBehaviour
                         Debug.LogError("소수 범위가 올바르지 않습니다.");
                         return min;
                     }
-                    return Random.Range(minDecimal, maxDecimal + 1) / 100f;
+                    return UnityEngine.Random.Range(minDecimal, maxDecimal + 1) / 100f;
                 }
             default:
                 return 0f;

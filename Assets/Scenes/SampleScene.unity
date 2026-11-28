@@ -226,7 +226,7 @@ PrefabInstance:
     - target: {fileID: 920914960881293754, guid: 5c5f76ee0acbbd047a032f971944fb50, type: 3}
       propertyPath: combinationManager
       value: 
-      objectReference: {fileID: 541675199}
+      objectReference: {fileID: 0}
     - target: {fileID: 920914960881293754, guid: 5c5f76ee0acbbd047a032f971944fb50, type: 3}
       propertyPath: combinedCardPrefab
       value: 
@@ -582,10 +582,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UIManager
   inventoryUI: {fileID: 1090911951}
   cardSelectionUI: {fileID: 1154214630}
-  inventory: []
-  references:
-    version: 2
-    RefIds: []
 --- !u!1 &491684551
 GameObject:
   m_ObjectHideFlags: 0
@@ -675,57 +671,6 @@ Transform:
   m_Children:
   - {fileID: 1030156583}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &541675198
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 541675200}
-  - component: {fileID: 541675199}
-  m_Layer: 0
-  m_Name: CardCombinationManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &541675199
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 541675198}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0e31227f4410e2c448ba2be7e8a7a976, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CardCombinationManager
-  validRules:
-  - parentOption: 8
-    childOption: 3
-  - parentOption: 4
-    childOption: 3
-  - parentOption: 3
-    childOption: 3
---- !u!4 &541675200
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 541675198}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1126.2944, y: 540.1482, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1120168802}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &578277686
 GameObject:
@@ -1413,7 +1358,6 @@ Transform:
   - {fileID: 1890698965}
   - {fileID: 1410492909}
   - {fileID: 447659244}
-  - {fileID: 541675200}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1154214625
@@ -1724,6 +1668,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1410492909}
   - component: {fileID: 1410492908}
+  - component: {fileID: 1410492910}
   m_Layer: 0
   m_Name: CardManager
   m_TagString: Untagged
@@ -1743,11 +1688,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 41c86798964d30744b784c1dfdd1d998, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardManager
+  inventory: []
+  combinationManager: {fileID: 1410492910}
   commonPool: {fileID: 11400000, guid: ca59a567750fc9c4db4730941f85ba11, type: 2}
   hardPool: {fileID: 11400000, guid: ca59a567750fc9c4db4730941f85ba11, type: 2}
   elitePool: {fileID: 11400000, guid: ca59a567750fc9c4db4730941f85ba11, type: 2}
   rewardPool: {fileID: 11400000, guid: ca59a567750fc9c4db4730941f85ba11, type: 2}
   bossPool: {fileID: 11400000, guid: ca59a567750fc9c4db4730941f85ba11, type: 2}
+  references:
+    version: 2
+    RefIds: []
 --- !u!4 &1410492909
 Transform:
   m_ObjectHideFlags: 0
@@ -1763,6 +1713,25 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1120168802}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1410492910
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1410492907}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e31227f4410e2c448ba2be7e8a7a976, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CardCombinationManager
+  validRules:
+  - parentOption: 8
+    childOption: 3
+  - parentOption: 4
+    childOption: 3
+  - parentOption: 3
+    childOption: 3
 --- !u!1 &1475460997
 GameObject:
   m_ObjectHideFlags: 0
