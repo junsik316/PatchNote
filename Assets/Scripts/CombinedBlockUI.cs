@@ -2,18 +2,14 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-// A single visual segment. CombinedCardUI arranges these as a flat stack;
-// the logical links are always owned by CardInstance, not by the UI.
+// One visible card segment. The parent/child chain lives only in CardInstance.
+// Icon, CardName, and UnlinkButton are direct children in CombinedBlock.prefab.
 public class CombinedBlockUI : MonoBehaviour
 {
     [Header("블록 UI")]
-    public Image background;
     public Image cardIcon;
     public Text cardName;
     public Button unlinkButton;
-
-    [Header("기존 프리팹 호환용 (새 방식에서는 사용하지 않음)")]
-    public Transform childSlot;
 
     [Header("카드 종류별 색상")]
     public Color numberColor = new Color(0.25f, 0.55f, 0.9f);
@@ -26,36 +22,13 @@ public class CombinedBlockUI : MonoBehaviour
         if (instance == null)
             return;
 
-        ScratchBlockGraphic shape = GetComponent<ScratchBlockGraphic>();
-        if (shape == null)
-            shape = gameObject.AddComponent<ScratchBlockGraphic>();
+        ScratchBlockGraphic graphic = GetComponent<ScratchBlockGraphic>();
+        if (graphic == null)
+            graphic = gameObject.AddComponent<ScratchBlockGraphic>();
 
-        shape.raycastTarget = false;
-        shape.color = GetBlockColor(instance);
-        shape.SetConnectors(hasParent, hasChild);
-
-        // The old prefab has a nested slot and a square background. Keep
-        // their serialized references, but render segments side by side in
-        // one VerticalLayoutGroup instead of nesting rectangles recursively.
-        if (childSlot != null)
-            childSlot.gameObject.SetActive(false);
-
-        if (background != null)
-        {
-            background.enabled = false;
-            RectTransform header = background.transform.parent as RectTransform;
-            if (header != null)
-            {
-                header.anchorMin = Vector2.zero;
-                header.anchorMax = Vector2.one;
-                header.offsetMin = Vector2.zero;
-                header.offsetMax = Vector2.zero;
-
-                Graphic[] graphics = header.GetComponentsInChildren<Graphic>(true);
-                foreach (Graphic graphic in graphics)
-                    graphic.raycastTarget = false;
-            }
-        }
+        graphic.color = BlockColor(instance);
+        graphic.SetConnectors(hasParent, hasChild);
+        graphic.raycastTarget = false;
 
         if (cardIcon != null)
         {
@@ -65,80 +38,70 @@ public class CombinedBlockUI : MonoBehaviour
             if (sprite != null)
                 cardIcon.sprite = sprite;
             cardIcon.raycastTarget = false;
-
-            RectTransform iconRect = cardIcon.rectTransform;
-            iconRect.anchorMin = new Vector2(0f, 0.5f);
-            iconRect.anchorMax = new Vector2(0f, 0.5f);
-            iconRect.pivot = new Vector2(0.5f, 0.5f);
-            iconRect.anchoredPosition = new Vector2(27f, 0f);
-            iconRect.sizeDelta = new Vector2(34f, 34f);
             cardIcon.preserveAspect = true;
+
+            RectTransform rect = cardIcon.rectTransform;
+            rect.anchorMin = new Vector2(0f, 0.5f);
+            rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(27f, 0f);
+            rect.sizeDelta = new Vector2(34f, 34f);
         }
 
         if (cardName != null)
         {
             cardName.text = CardInstanceDisplay.Title(instance);
             cardName.alignment = TextAnchor.MiddleLeft;
+            cardName.color = Color.white;
             cardName.fontSize = 17;
             cardName.resizeTextForBestFit = true;
             cardName.resizeTextMinSize = 11;
             cardName.resizeTextMaxSize = 17;
-            cardName.color = Color.white;
             cardName.raycastTarget = false;
 
-            RectTransform nameRect = cardName.rectTransform;
-            nameRect.anchorMin = Vector2.zero;
-            nameRect.anchorMax = Vector2.one;
-            nameRect.offsetMin = new Vector2(54f, 11f);
-            nameRect.offsetMax = new Vector2(-41f, -11f);
+            RectTransform rect = cardName.rectTransform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(54f, 11f);
+            rect.offsetMax = new Vector2(-41f, -11f);
         }
 
         if (unlinkButton != null)
         {
             unlinkButton.onClick.RemoveAllListeners();
             unlinkButton.gameObject.SetActive(hasParent);
-            if (hasParent)
+            if (hasParent && owner != null)
                 unlinkButton.onClick.AddListener(() => owner.DisconnectCard(instance));
 
-            RectTransform unlinkRect = unlinkButton.transform as RectTransform;
-            if (unlinkRect != null)
+            RectTransform rect = unlinkButton.transform as RectTransform;
+            if (rect != null)
             {
-                unlinkRect.anchorMin = new Vector2(1f, 0.5f);
-                unlinkRect.anchorMax = new Vector2(1f, 0.5f);
-                unlinkRect.pivot = new Vector2(0.5f, 0.5f);
-                unlinkRect.anchoredPosition = new Vector2(-20f, 0f);
-                unlinkRect.sizeDelta = new Vector2(29f, 29f);
+                rect.anchorMin = new Vector2(1f, 0.5f);
+                rect.anchorMax = new Vector2(1f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = new Vector2(-20f, 0f);
+                rect.sizeDelta = new Vector2(29f, 29f);
             }
 
-            Image unlinkImage = unlinkButton.GetComponent<Image>();
-            if (unlinkImage != null)
+            Image image = unlinkButton.GetComponent<Image>();
+            if (image != null)
             {
-                unlinkImage.color = new Color(0.08f, 0.10f, 0.16f, 0.8f);
-                unlinkImage.raycastTarget = true;
+                image.color = new Color(0.08f, 0.10f, 0.16f, 0.8f);
+                image.raycastTarget = true;
             }
 
-            TMP_Text buttonLabel = unlinkButton.GetComponentInChildren<TMP_Text>(true);
-            if (buttonLabel != null)
+            TMP_Text label = unlinkButton.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
             {
-                buttonLabel.text = "×";
-                buttonLabel.fontSize = 22f;
-                buttonLabel.alignment = TextAlignmentOptions.Center;
-                buttonLabel.raycastTarget = false;
-            }
-            else
-            {
-                Text legacyLabel = unlinkButton.GetComponentInChildren<Text>(true);
-                if (legacyLabel != null)
-                {
-                    legacyLabel.text = "×";
-                    legacyLabel.alignment = TextAnchor.MiddleCenter;
-                    legacyLabel.raycastTarget = false;
-                }
+                label.text = "×";
+                label.fontSize = 22;
+                label.alignment = TextAlignmentOptions.Center;
+                label.raycastTarget = false;
             }
         }
     }
 
-    private Color GetBlockColor(CardInstance instance)
+    private Color BlockColor(CardInstance instance)
     {
         switch (instance.cardType)
         {
@@ -152,8 +115,7 @@ public class CombinedBlockUI : MonoBehaviour
     }
 }
 
-// Both individual and combined cards display the VALUE of an instance,
-// rather than only its ScriptableObject template name.
+// Display values come from individual CardInstance objects, never templates.
 public static class CardInstanceDisplay
 {
     public static string Title(CardInstance instance)
