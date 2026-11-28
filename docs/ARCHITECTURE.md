@@ -1,212 +1,114 @@
 # PatchNote — 프로그램 구조 설계
 
-> **기준:** GitHub `master` (`8a0e951`, 2026-11-28 확인) 및 `SampleScene.unity`의 계층 구조  
-> **문서 목적:** **매니저를 기능의 소유자이자 실행 주체로 정의**하고, 각 매니저가 관리하는 하위 시스템·데이터·실행 흐름을 한곳에서 확인한다.  
-> **표기:** **현행** = 저장소에서 확인한 코드·씬 / **목표** = 아직 구현·검증이 필요한 설계. 코드 존재와 Unity Play Mode 동작 검증은 다르다.
+> **설계 기준:** 2026-11-28 카드 매니저 책임 개편 · 게임 코드 PR #2 (`refactor/card-state-effect-lifecycle`) 
+> **상태:** 아래 카드 시스템 구조는 **PR 제안 코드 기준**이다. `master`의 실제 코드에는 PR 병합 전까지 반영되지 않는다. Unity Play Mode 검증도 아직 완료하지 않았다.
+> **원칙:** 기능별 매니저가 외부 진입점을 제공하고, 하위 구성 요소가 세부 작업을 맡는다. 수치의 소유자와 카드 계산기는 분리한다.
 
-## 1. 설계 원칙 — 기능은 매니저 아래에서 움직인다
+## 1. 매니저 중심 책임 구조
 
-`GameManager`는 게임의 최상위 참조·플레이어 등록을 담당한다. 실제 게임 기능은 **기능별 매니저가 시작하고 조정**하며, 하위 클래스는 그 기능의 데이터를 계산하거나 화면에 표시한다. 기능 목록을 독립적으로 나열하기보다 **누가 시작하고, 무엇을 소유하며, 누구에게 위임하는가**로 구조를 읽는다.
-
-| 기능의 주인 | 현행 책임과 주요 진입점 | 관리·호출하는 구성 요소 |
+| 매니저 | 소유·조정하는 책임 | 하위 구성 요소 / 호출 대상 |
 |---|---|---|
-| `GameManager` | 싱글턴 참조, 플레이어 등록(`RegisterPlayer`), 매니저 접근점 | `MapManager`, `CardManager`, `UIManager`, `Playercontroller`, `PlayerPhysicsEffects` |
-| `MapManager` | 맵 초기화(`InitializeMap`), 방 전환(`SetCurrentRoom`), 클리어(`ClearStage`), 보상 발생 요청 | `MapTree`, `RoomData`, `RoomMaker`, `RoomEnemySpawner`, `MapMaker`, `MiniMap`, `Door`, `CardManager` |
-| `CardManager` | 방별 카드 풀, 후보 생성(`ShowCardSelection`), 인스턴스 생성, 보상 확정(`SendCard`) | `CardPool`, `CardData`, `CardInstance` 파생 타입, `UIManager` |
-| `CardCombinationManager` | 조합 허용 규칙(`TryConnect`), 부모/자식 연결, 순환 방지, 분리(`Disconnect`) | `CardCombinationRule`, `CardInstance` 체인; `InventoryUI`가 이 매니저를 호출 |
-| `UIManager` | 보유 카드 목록, 인벤토리/보상 화면, 일시정지, 적용 수치 재계산 | `InventoryUI`, `InventoryCardUI`, `CombinedCardUI`, `CombinedBlockUI`, `ScratchBlockGraphic`, `CardSelectionUI`, `PlayerPhysicsEffects` |
+| `GameManager` | 최상위 실행 맥락, 플레이어 등록, 매니저 참조 | `MapManager`, `CardManager`, `UIManager`, 플레이어 |
+| `MapManager` | 맵 생성, 방 전환, 적·클리어·보상 흐름 | `MapTree`, `RoomData`, `RoomMaker`, `RoomEnemySpawner`, `MapMaker`, `MiniMap`, `Door` |
+| `CardManager` | 카드 상태의 유일한 소유, 카드 생성·획득, 연결·해제 진입점, 카드 효과 계산 요청 및 갱신 통보 | `CardCombinationManager`, `CardEffectEvaluator`, `CardPool`, `CardInstance`, `ICardEffectReceiver` |
+| `UIManager` | 인벤토리 표시, 카드 선택 화면, 일시정지 및 UI 수명주기 | `InventoryUI`, `CardSelectionUI`, `CombinedCardUI`, `ScratchBlockGraphic` |
 
-> `RoomMaker`나 `RoomEnemySpawner` 같은 이름도 내부 기능을 관리하지만, **게임 진행의 소유자**는 `MapManager`다. `Playercontroller`와 `PlayerPhysicsEffects`는 플레이어의 입력·물리 실행기이며 `GameManager`가 그 참조를 제공한다. 여기서의 소유 관계는 Unity `Transform`의 부모-자식 관계와 동일한 의미가 아니다.
-
-### 매니저 중심 의존 관계
+`CardCombinationManager`는 **별도 C# 클래스 / Unity 컴포넌트**로 유지하지만, 외부 시스템에서는 `CardManager.TryConnect`와 `CardManager.Disconnect`를 통해 접근한다. 이는 C# 상속 관계가 아니라 **구성(composition)과 위임**이다.
 
 ```mermaid
 flowchart TB
-    GM[GameManager\n매니저 참조·플레이어 등록]
-    subgraph MAP[MapManager — 방 진행]
-        MM[MapManager]
-        MT[MapTree / RoomData]
-        RM[RoomMaker / Door]
-        ES[RoomEnemySpawner / Enemy AI]
-        MP[MapMaker / MiniMap]
-        MM --> MT
-        MM --> RM
-        MM --> ES
-        MM --> MP
-    end
-    subgraph CARD[CardManager — 카드 보상]
-        CM[CardManager]
-        CD[CardPool / CardData]
-        CI[CardInstance 파생 타입]
-        CM --> CD
-        CM --> CI
-    end
-    subgraph COMBO[CardCombinationManager — 조합 규칙]
-        CC[CardCombinationManager]
-        CH[CardInstance parentCard / childCard]
-        CC --> CH
-    end
-    subgraph UI[UIManager — 인벤토리와 화면]
-        UM[UIManager]
-        IV[InventoryUI / InventoryCardUI]
-        BL[CombinedCardUI / CombinedBlockUI]
-        SEL[CardSelectionUI]
-        UM --> IV
-        IV --> BL
-        UM --> SEL
-    end
-    GM --> MM
-    GM --> CM
-    GM --> UM
-    MM -->|방 클리어 보상| CM
-    CM -->|선택 UI · 카드 지급| UM
-    IV -->|연결·해제 요청| CC
-    UM -->|변경 후 재계산| PE[PlayerPhysicsEffects]
-    GM -->|플레이어 참조| PE
+  GM[GameManager] --> MM[MapManager]
+  GM --> CM[CardManager]
+  GM --> UM[UIManager]
+  MM --> RM[RoomMaker / RoomEnemySpawner / RoomData]
+  MM --> CM
+  UM --> INV[InventoryUI / CardSelectionUI]
+  INV -->|연결·해제 요청| CM
+  CM --> COMBO[CardCombinationManager]
+  CM --> EVAL[CardEffectEvaluator]
+  CM --> STATE[CardInstance 목록과 연결 상태]
+  CM -->|갱신 통보| REC[ICardEffectReceiver]
+  REC -->|기본 수치 전달·평가 요청| CM
+  REC --> PLAYER[PlayerPhysicsEffects / 향후 EnemyStats 등]
 ```
 
-화살표는 **개념적인 호출·접근 방향**이며 매니저 객체의 Unity 계층을 나타내지 않는다. `CardEffectEvaluator`는 현재 없는 **목표 시스템**이므로 이 현행 그림에서는 제외했다.
+## 2. CardManager — 카드 데이터와 규칙의 단일 소유자
 
-## 2. GameManager — 실행 맥락과 플레이어 참조
+### 보유 상태
 
-**역할:** 다른 매니저가 플레이어와 최상위 기능에 접근할 수 있도록 게임 실행 맥락을 제공한다. 모든 세부 처리를 직접 구현하는 거대한 관리자 역할은 피한다.
+- `CardData`는 ScriptableObject **템플릿**이다. 카드의 개별 연산값이나 연결 상태를 템플릿에 기록하지 않는다.
+- `CardInstance`는 **획득한 개별 카드**다. 파생 타입에 연산자, 숫자, 속성, 대상 등이 있고 `parentCard` / `childCard`는 선형 연결을 표현한다.
+- `CardManager.inventory : List<CardInstance>`만 보유 카드의 권위 있는 원본이다. UI에서 같은 리스트를 별도로 소유하지 않는다.
+- 인벤토리는 **모든 원본 인스턴스**를 유지한다. 합성·분리로 새 원본 카드가 만들어지지 않는다.
+- **인벤토리의 루트 순서 = 동일한 대상·속성을 수정하는 여러 카드 체인의 적용 순서**. 한 체인 안에서는 루트에서 자식으로 순차 연산한다. UI 역시 같은 루트 순서를 표시한다.
+- `CardManager`는 최종 물리·스탯 수치를 저장하지 않는다. 각 수치의 원본과 최종 적용값은 대상 객체의 컴포넌트가 소유한다.
 
-- **현행 상태:** `Instance` 싱글턴, `mapManager`·`cardManager`·`uiManager` 참조, `RegisterPlayer(Playercontroller)`, `PlayerPhysics` 접근 프로퍼티.
-- **시작 흐름:** `MapManager.InitializeMap()`가 플레이어 프리팹을 생성 → `GameManager.RegisterPlayer()` → `PlayerPhysicsEffects` 등을 조회할 수 있게 됨.
-- **수명 주기:** `GameManager`에 `DontDestroyOnLoad(gameObject)`가 있으나 다른 매니저가 동일하게 영속화되는 것은 아니다. 씬 전환 시 참조 재연결 정책이 필요하다.
-- **목표:** 씬을 넘는 게임 상태와 씬 단위 매니저 수명 주기를 명확히 분리한다.
+### 카드 관리 진입점
 
-## 3. MapManager — 맵·방·전투 진행을 묶는 관리자
-
-`MapManager`는 방 진행의 **단일 오케스트레이터**다. 직접 타일을 칠하거나 적 AI를 실행하는 대신 담당 구성 요소를 호출한다.
-
-| MapManager가 시작하는 기능 | 담당 하위 요소 | 현행 설명 |
+| 외부 요청 | CardManager의 처리 | 위임 대상 |
 |---|---|---|
-| 맵 그래프 생성·시작 방 선택 | `MapTree` | `GenerateMap()` → `GetRooms()` → `GetStartNode()` |
-| 방별 상태 조회·복원 | `RoomData`, `roomDataDictionary` | `isCleared` 등을 노드별로 보관; `PrepareRoomState()` |
-| 방 지형·문 생성 | `RoomMaker`, `Door`, Tilemap | `GenerateRoom(currentNode)`와 `SetAllDoorsOpen()` |
-| 플레이어 배치·이동 | `GameManager`, `Playercontroller` | 시작 방에서는 프리팹 생성·등록, 이후 `SetCurrentRoom()`에서 위치 이동 |
-| 적 생성·제거·전멸 통지 | `RoomEnemySpawner`, `EnemyController`, `EnemyLife` | `SpawnCurrentRoomEnemies()`, `AllEnemiesDefeated` 이벤트 구독 |
-| 클리어·문 개방·보상 요청 | `RoomData`, `CardManager` | `ClearStage()`에서 상태를 저장하고 `ShowCardSelection()` 요청 |
-| 지도 UI 초기화 | `MapMaker`, `MiniMap` | 시작 시 `GenerateMapUI(mapNodes, currentNode)` 호출; 미니맵 갱신은 일부 미구현 |
+| 보상 후보 요청 | 방 타입별 카드 풀 선택·인스턴스 생성 | `CardPool`, 파생 `CardInstance` |
+| 카드 획득 | 단일 목록 추가, 목록 변경 통지, 효과 갱신 | `InventoryChanged`, 수신자 목록 |
+| 카드 연결 | 보유 카드 확인 후 규칙 검사·체인 연결 | `CardCombinationManager.TryConnect` |
+| 카드 분리 | 보유 카드 확인 후 체인 연결 해제 | `CardCombinationManager.Disconnect` |
+| 최종 값 요청 | 대상·속성·기본값을 입력받고 연결된 연산 적용 | `CardEffectEvaluator.EvaluatePhysics` |
+| 수신 객체 등록 | 등록 즉시 현재 카드 상태를 평가·초기화 | `ICardEffectReceiver.RefreshCardEffects` |
 
-### 현행 실행 순서
+## 3. 카드 효과 계산 및 이벤트 수명주기
 
-```text
-MapManager.Start
-  └─ InitializeMap
-      ├─ MapTree.GenerateMap / 시작 노드 선택
-      ├─ PrepareRoomState (시작 방 클리어 처리)
-      ├─ RoomMaker.GenerateRoom
-      ├─ 플레이어 프리팹 생성 → GameManager.RegisterPlayer
-      ├─ SpawnCurrentRoomEnemies (시작 방은 클리어 상태이므로 생략)
-      └─ MapMaker.GenerateMapUI
-
-Door 등의 요청 → MapManager.SetCurrentRoom(targetNode)
-  ├─ 이전 방 적 정리
-  ├─ 노드 변경 / PrepareRoomState
-  ├─ RoomMaker.GenerateRoom
-  ├─ 플레이어 위치 갱신
-  └─ 미클리어 방이면 적 생성
-       └─ 전멸 이벤트 → ClearStage → 문 개방 → CardManager.ShowCardSelection
-```
-
-### 목표와 제약
-
-- 방 전환은 **현행 `SetCurrentRoom`**, 문 상호작용을 통한 양방향 복원 API `TryEnterRoom(targetNode, fromNode)`는 **제안**이다. 현행 API와 혼동하지 않는다.
-- 이미 클리어한 방은 적·보상 중복이 없어야 한다. **목표:** `RoomData`에서 생성·클리어·보상 수령 상태를 각각 관리한다.
-- 지형 생성은 `RoomMaker`가 소유하며, 플랫폼의 두께·연결성·점프 가능성 검사는 **개발 목표**다. 현재 검증 완료로 기재하지 않는다.
-- 적이 플랫폼 끝에서 떨어지지 않도록 하는 지형 감지는 `EnemyController` 등의 실행 책임이다. `MapManager`에 AI 로직을 넣지 않는다.
-
-## 4. CardManager — 보상 후보와 카드 인스턴스 생성
-
-**역할:** 현재 방의 `CardPool`에서 후보를 뽑아 **각 카드의 런타임 인스턴스**를 만들고 선택 결과를 전달한다.
-
-- `ShowCardSelection(node)`: 노드 종류에 따라 `commonPool`·`hardPool`·`elitePool`·`rewardPool`·`bossPool` 중 하나를 선택한다.
-- `GenerateCards(pool)`: 가중치에 따라 최대 3장의 후보를 만들고 동일 `CardData`의 중복 선정을 제거한다.
-- `GenerateCardInstance(data)`: `NumberCardInstance`, `PhysicsCardInstance`, `StatCardInstance`, `SpecialCardInstance`를 생성한다. `TargetCardInstance` 타입은 있지만 `TargetCardData`가 없어 **현재 보상 생성 대상이 아니다**.
-- `SendCard(index)`: 선택된 인스턴스를 `GameManager.Instance.uiManager.AddCard(instance)`로 보내고 카드 선택 화면을 닫는다.
-
-### 매니저가 관리하는 카드 데이터
-
-```text
-CardData (ScriptableObject 템플릿)
-  ├─ NumberCardData
-  ├─ PhysicsCardData
-  ├─ StatCardData
-  └─ SpecialCardData
-
-CardInstance (추상 클래스, 인스턴스 공통 데이터)
-  ├─ NumberCardInstance (연산자·숫자값)
-  ├─ PhysicsCardInstance (물리 종류)
-  ├─ StatCardInstance (능력치 종류)
-  ├─ SpecialCardInstance (특수 효과 종류)
-  └─ TargetCardInstance (대상; 현재 생성 미연결)
-```
-
-`CardData`와 `CardInstance`를 구별한다. **합성은 기존 인스턴스를 연결하는 것**이며 새로운 합성용 원본 인스턴스를 생성하지 않는다.
-
-## 5. CardCombinationManager — 카드 연결의 규칙 소유자
-
-`InventoryUI`는 사용자의 드롭·분리 입력을 이 매니저에게 전달한다. **연결 가능성 판단과 `parentCard`·`childCard` 갱신은 `CardCombinationManager`의 책임**이다.
-
-- **현행 규칙:** `Physics → Number`, `Stat → Number`, `Number → Number` (`CardOption` 플래그로 검사).
-- `TryConnect(parent, child)`: null·자기 자신·이미 연결된 부모/자식·순환·허용 규칙을 검사하고 연결한다.
-- `Disconnect(child)`: 전달받은 카드와 앞 카드의 연결을 해제한다. `A → B → C`에서 `B`를 분리하면 `A`와 `B → C`가 된다.
-- **UI의 책임:** 합성된 **묶음의 마지막 카드**를 실제 부모로 선택하고, 조합 결과에 맞춰 표시를 갱신한다.
-- **목표:** `Target → Physics` 조합은 아직 허용되지 않는다. Target 카드에 따른 적용 주체 변경과 규칙 확장은 별도 작업이다.
-
-## 6. UIManager — 인벤토리·보상 창·시각화를 묶는 관리자
-
-`UIManager`는 **현재 카드 인벤토리 데이터와 화면 전환의 책임 주체**다. 하위 UI 컴포넌트는 화면 구성·입력 이벤트를 담당한다.
-
-| UIManager의 기능 | 하위 구성 요소 | 현행 처리 |
-|---|---|---|
-| 카드 보유 목록 | `List<CardInstance> inventory` | `AddCard(instance)`로 인스턴스 추가 |
-| 인벤토리 열기·닫기 | `InventoryUI`, `InventoryCardUI` | `ToggleInventory()`로 표시와 시간 정지/복구 |
-| 합성 체인 시각화 | `CombinedCardUI`, `CombinedBlockUI`, `ScratchBlockGraphic` | 루트 체인을 하나의 블록 묶음으로 표시하고 색상·연산값을 보여줌 |
-| 연결·분리 입력 | `InventoryUI` → `CardCombinationManager` | 드롭·해제 후 UI 갱신 요청 |
-| 카드 보상 화면 | `CardSelectionUI` | `ShowCardSelection`, `CloseCardSelection` |
-| 카드 효과 반영 요청 | `PlayerPhysicsEffects` | `RecalculatePhysicsCoefficients()`에서 현행 인벤토리를 전달 |
-
-### 인벤토리 합성 흐름
+카드 효과를 받는 컴포넌트는 `ICardEffectReceiver`를 구현한다. 이 인터페이스는 상태 저장소가 아니며, **현재 상태 적용을 위한 공통 계약**이다.
 
 ```mermaid
 sequenceDiagram
-    actor Player
-    participant Inv as InventoryUI
-    participant Combo as CardCombinationManager
-    participant UIM as UIManager
-    participant P as PlayerPhysicsEffects
-    Player->>Inv: 카드 묶음 드래그·드롭
-    Inv->>Combo: TryConnect(마지막 카드, 새 묶음 루트)
-    Combo-->>Inv: 성공 / 실패
-    alt 연결 성공
-        Inv->>UIM: RecalculatePhysicsCoefficients()
-        UIM->>P: Recalculate(inventory)
-        Inv->>Inv: RefreshInventory() — 블록 체인 재표시
-    end
-    Player->>Inv: 연결 해제 클릭
-    Inv->>Combo: Disconnect(child)
-    Inv->>UIM: RecalculatePhysicsCoefficients()
-    Inv->>Inv: RefreshInventory()
+  participant Receiver as PlayerPhysicsEffects
+  participant Card as CardManager
+  participant Evaluator as CardEffectEvaluator
+  Receiver->>Card: RegisterReceiver(this)
+  Card->>Receiver: RefreshCardEffects(this)
+  Receiver->>Card: GetModifiedPhysicsValue(target, type, baseValue)
+  Card->>Evaluator: EvaluatePhysics(inventory, target, type, baseValue)
+  Evaluator-->>Receiver: 최종 계산 값
+  Note over Receiver: 자신의 Rigidbody2D/이동·점프 값에 적용
+  Note over Card: 카드 획득·연결·분리 시
+  Card->>Receiver: RefreshCardEffects(this)
 ```
 
-- 화면의 블록 모양은 **`ScratchBlockGraphic`**, 한 줄의 카드 내용과 해제 버튼은 **`CombinedBlockUI`**, 여러 블록의 묶음은 **`CombinedCardUI`**, 드래그·인벤토리 목록은 **`InventoryCardUI`·`InventoryUI`**가 맡는다.
-- `CardInstance` 체인은 **최대 부모 1명·자식 1명의 선형 관계**이며 UI 계층은 그 구조의 표시물이다.
-- **주의:** 이 코드는 저장소에 반영되었지만 Unity 화면에서 홈·돌기·레이아웃·중간 분리·클릭 동작을 회귀 테스트했는지는 별도 확인이 필요하다.
-- **향후 고려:** 인벤토리의 저장·복원 및 상점·덱 시스템이 커지면 데이터 책임을 `InventoryManager` 등으로 분리할지 결정한다. 현재는 임의로 옮기지 않는다.
+- **최초 등록 시 1회 초기화**: 객체가 생성되면 기존 카드 상태를 적용한다. 카드 연결이 없는 경우 기본값이 사용된다.
+- **변경 시 알림**: 카드의 획득·연결·해제 시 관련 대상의 수신자를 갱신한다. PR #2의 현재 구현은 Player와 Enemy 수신 그룹 모두를 갱신하는 단순한 1차 방식이다.
+- **해제 시 정리**: `OnDisable` 등에서 등록을 해제한다. 동일 수신자의 중복 등록을 피한다.
+- **계산 순서**: 카드를 획득한 리스트 순서로 루트 체인을 순회하며 같은 속성의 결과를 누적한다. `×2` 후 `+3`과 `+3` 후 `×2`는 다르므로 UI 순서도 중요하다.
+- **대상 정책**: 현재 구현에서 Target 카드가 없는 기존 Physics 체인은 Player에 적용한다. World/전체 적, 특정 적의 식별, Target 카드의 실제 보상 생성은 미완성이다.
+- **값의 위치**: 기본 이동 속도·점프력·중력·마찰·탄성은 `PlayerPhysicsEffects`가 관리한다. `CardEffectEvaluator`는 수정 규칙만 계산한다.
 
-## 7. 물리 효과·플레이어 실행 — 매니저 아래의 수행 요소
+## 4. 데이터 수명과 직렬화
 
-**현행:** `UIManager`가 갱신을 요청하고 `PlayerPhysicsEffects`가 인벤토리 체인으로부터 플레이어의 이동 속도·점프력·중력·마찰·탄성 등을 재계산한다. `Playercontroller`는 계산 결과를 읽어 실제 이동·점프를 수행한다.
+- `CardManager`는 씬 루트로 분리한 뒤 `DontDestroyOnLoad`로 씬 전환 중 목록을 유지하도록 구성한다.
+- 보유 목록은 `[SerializeReference]`를 적용하고 연결 필드에도 관리 참조를 사용한다. 추상 `CardInstance` 파생 타입과 연결 객체의 정체성을 **동일한 직렬화 호스트 내에서** 보존하려는 목적이다.
+- `[SerializeReference]` 자체는 실행 중 수정된 카드를 게임 종료 후 저장하는 기능이 아니다. 영구 세이브는 추후 카드 고유 ID, 카드별 값, 연결 카드 ID, 루트 적용 순서 등을 파일로 기록해야 한다.
+- `CardCombinationManager`는 조합 규칙 데이터를 유지한 채 `CardManager`의 하위 구성 요소로 이동한다. 기존 Inspector 규칙을 삭제하지 않도록 주의한다.
+- 씬 전환 시 영속 `CardManager`와 씬 범위의 `MapManager`·`UIManager` 간 참조를 다시 확인해야 한다. 씬 재로드 및 중복 매니저 생성에 대한 Play Mode 검증이 필수다.
 
-**목표:** `CardEffectEvaluator`(체인 해석·수치 계산)와 적용기(`EffectApplier` 또는 플레이어/적 적용 컴포넌트)를 분리해, UI 없이도 계산을 테스트할 수 있게 만든다. 현재 `EnemyTarget → GravityScale → ×2` 및 맵 전체 물리 적용이 구현됐다고 간주하지 않는다.
+## 5. UIManager — 화면 책임만 유지
 
-```text
-현행: UIManager → PlayerPhysicsEffects(계산 + 플레이어 적용) → Playercontroller
-목표: CardInstance 체인 → CardEffectEvaluator → 대상별 EffectApplier
-```
+- `InventoryUI`는 `CardManager.Inventory`를 읽어 단일 카드 또는 선형 체인을 블록으로 표시한다.
+- 드래그·드롭은 `InventoryUI` → `CardManager.TryConnect` → `CardCombinationManager` 경로로 수행한다.
+- 연결·해제 후 `CardManager.InventoryChanged`가 발생하면 열린 인벤토리 화면을 재생성한다. 드래그 중에는 종료 시점까지 화면 갱신을 보류한다.
+- 보상 선택 화면의 열기·닫기, 시간 정지·복구는 `UIManager`에 남긴다. 카드 획득의 실제 기록은 `CardManager.AddCard`가 수행한다.
+- `InventoryCardUI`, `CombinedCardUI`, `CombinedBlockUI`, `ScratchBlockGraphic`은 데이터를 복제하거나 카드 효과를 계산하지 않는다.
+
+## 6. MapManager와 GameManager — 다른 매니저와의 관계
+
+- `GameManager`는 플레이어 등록과 최상위 매니저 참조를 제공한다. 개별 카드 연산·방 지형 로직은 포함하지 않는다.
+- `MapManager`는 방 생성·진행의 주체로 남고, `RoomMaker`가 지형, `RoomEnemySpawner`가 적 생성·전멸 통지를 맡는다.
+- 방 클리어 시 `MapManager`는 `CardManager.ShowCardSelection`을 호출하고, 카드가 선택되면 `CardManager`가 인스턴스를 보유 목록에 추가한다.
+- 플레이어 또는 적이 등장하면 효과 수신자가 `CardManager`에 등록해 현재 카드 상태를 적용한다. 적 효과 수신자는 **확장 목표**이며 PR #2에서 직접 구현되지는 않았다.
+
+## 7. 변경과 검증 경계
+
+- PR #2는 **코드 변경 제안**이다. Unity 6000.4.0f1 실제 컴파일·씬 재입장·연결/분리·인스펙터 참조 테스트는 아직 수행하지 않았다.
+- 카드 목록이 `UIManager`에서 제거되므로 이전 씬의 직렬화 필드에 저장된 실제 카드가 있었다면 별도 데이터 이전이 필요하다. 이번 확인 시점의 `SampleScene` 인벤토리 목록은 비어 있다.
+- `GameManager`에서 현재 플레이어를 조회하는 방식과 신규 수신자 초기화 순서를 함께 검증한다.
+- 장기 작업: 대상 카드의 생성·적용 범위, 효과 종류 확장, 저장 파일 포맷, 효과 순서 UI, 중복 지속 매니저 정리.
 
 ## 8. 실제 Unity 씬 계층 구조 (현행)
 
