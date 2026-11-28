@@ -1,9 +1,152 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class CardManager : MonoBehaviour
 {
-    [Header("¹æ Á¾·ùº° Ä«µå Ç®")]
+    public static CardManager Instance { get; private set; }
+
+    [Header("Owned card state (inventory order = effect order)")]
+    [SerializeReference]
+    private List<CardInstance> inventory = new List<CardInstance>();
+
+    [Header("Card subsystems")]
+    [SerializeField] private CardCombinationManager combinationManager;
+
+    public IReadOnlyList<CardInstance> Inventory => inventory;
+    public event Action InventoryChanged;
+
+    private readonly CardEffectEvaluator evaluator = new CardEffectEvaluator();
+    private readonly Dictionary<EffectTarget, HashSet<ICardEffectReceiver>> receivers =
+        new Dictionary<EffectTarget, HashSet<ICardEffectReceiver>>();
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+        // Initially the manager is a child of Managers in SampleScene.
+        // Detach it before marking the singleton persistent.
+        transform.SetParent(null, true);
+        DontDestroyOnLoad(gameObject);
+
+        if (combinationManager == null)
+            combinationManager = FindFirstObjectByType<CardCombinationManager>();
+
+        if (combinationManager == null)
+            combinationManager = gameObject.AddComponent<CardCombinationManager>();
+        else if (combinationManager.transform != transform)
+            combinationManager.transform.SetParent(transform, true);
+    }
+
+    private void Start()
+    {
+        if (GameManager.Instance != null)
+            GameManager.Instance.cardManager = this;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
+    }
+
+    public bool ContainsCard(CardInstance card)
+    {
+        return card != null && inventory.Contains(card);
+    }
+
+    public bool AddCard(CardInstance card)
+    {
+        if (card == null || ContainsCard(card))
+            return false;
+
+        inventory.Add(card);
+        NotifyCardStateChanged();
+        return true;
+    }
+
+    public bool TryConnect(CardInstance parent, CardInstance child)
+    {
+        if (!ContainsCard(parent) || !ContainsCard(child) ||
+            combinationManager == null ||
+            !combinationManager.TryConnect(parent, child))
+            return false;
+
+        NotifyCardStateChanged();
+        return true;
+    }
+
+    public bool Disconnect(CardInstance child)
+    {
+        if (!ContainsCard(child) || child.parentCard == null ||
+            combinationManager == null)
+            return false;
+
+        combinationManager.Disconnect(child);
+        NotifyCardStateChanged();
+        return true;
+    }
+
+    public float GetModifiedPhysicsValue(
+        EffectTarget target, PhysicsType property, float baseValue)
+    {
+        return evaluator.EvaluatePhysics(inventory, target, property, baseValue);
+    }
+
+    public void RegisterReceiver(ICardEffectReceiver receiver)
+    {
+        if (receiver == null)
+            return;
+
+        if (!receivers.TryGetValue(receiver.Target, out var group))
+        {
+            group = new HashSet<ICardEffectReceiver>();
+            receivers.Add(receiver.Target, group);
+        }
+
+        if (group.Add(receiver))
+            receiver.RefreshCardEffects(this); // Initial state hydration.
+    }
+
+    public void UnregisterReceiver(ICardEffectReceiver receiver)
+    {
+        if (receiver != null &&
+            receivers.TryGetValue(receiver.Target, out var group))
+            group.Remove(receiver);
+    }
+
+    public void RefreshEffects(EffectTarget target)
+    {
+        if (!receivers.TryGetValue(target, out var group))
+            return;
+
+        // Copy the set because a receiver may unregister while refreshing.
+        foreach (ICardEffectReceiver receiver in new List<ICardEffectReceiver>(group))
+        {
+            if (receiver is UnityEngine.Object unityObject && unityObject == null)
+            {
+                group.Remove(receiver);
+                continue;
+            }
+
+            receiver.RefreshCardEffects(this);
+        }
+    }
+
+    private void NotifyCardStateChanged()
+    {
+        InventoryChanged?.Invoke();
+        // Both targets refresh: the Target card of a chain may have changed.
+        RefreshEffects(EffectTarget.Player);
+        RefreshEffects(EffectTarget.Enemy);
+    }
+
+    [Header("ë°© ì¢…ë¥˜ë³„ ì¹´ë“œ í’€")]
     public CardPool commonPool;
     public CardPool hardPool;
     public CardPool elitePool;
@@ -17,7 +160,7 @@ public class CardManager : MonoBehaviour
         CardPool pool = GetCardPool(node);
         if (pool == null)
         {
-            Debug.LogError("ÇØ´ç ¹æÀÇ Ä«µå Ç®ÀÌ ¼³Á¤µÇÁö ¾Ê¾Ò½À´Ï´Ù.");
+            Debug.LogError("í•´ë‹¹ ë°©ì˜ ì¹´ë“œ í’€ì´ ì„¤ì •ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.");
             return;
         }
 
@@ -49,7 +192,7 @@ public class CardManager : MonoBehaviour
             if (selectedEntry == null)
                 break;
 
-            // ÀÎ½ºÅÏ½º ±¸¼ºÀÌ Áö¿øµÇ´Â µ¥ÀÌÅÍ¸¸ ¼±ÅÃ ¸ñ·Ï¿¡ Ãß°¡ÇÑ´Ù.
+            // ì¸ìŠ¤í„´ìŠ¤ êµ¬ì„±ì´ ì§€ì›ë˜ëŠ” ë°ì´í„°ë§Œ ì„ íƒ ëª©ë¡ì— ì¶”ê°€í•œë‹¤.
             CardInstance instance = GenerateCardInstance(selectedEntry.cardData);
             if (instance != null)
                 selectedCards.Add(instance);
@@ -60,7 +203,7 @@ public class CardManager : MonoBehaviour
         }
     }
 
-    // ¿ø·¡ °¡ÁßÄ¡ ÃßÃ· ·ÎÁ÷À» À¯Áö.
+    // ì›ë˜ ê°€ì¤‘ì¹˜ ì¶”ì²¨ ë¡œì§ì„ ìœ ì§€.
     private CardPoolEntry SelectCard(List<CardPoolEntry> cards)
     {
         float totalWeight = 0f;
@@ -87,7 +230,7 @@ public class CardManager : MonoBehaviour
         return null;
     }
 
-    // CardData´Â ¼öÁ¤ÇÏÁö ¾Ê°í »ı¼ºµÇ´Â CardInstance¸¸ ±¸Ã¼ Å¸ÀÔÀ¸·Î º¯°æ.
+    // CardDataëŠ” ìˆ˜ì •í•˜ì§€ ì•Šê³  ìƒì„±ë˜ëŠ” CardInstanceë§Œ êµ¬ì²´ íƒ€ì…ìœ¼ë¡œ ë³€ê²½.
     private CardInstance GenerateCardInstance(CardData data)
     {
         if (data is NumberCardData numberCard)
@@ -104,12 +247,12 @@ public class CardManager : MonoBehaviour
         if (data is StatCardData statCard)
             return new StatCardInstance(statCard);
 
-        // Æ¯¼ö Ä«µå Ç®À» ¾ÆÁ÷ »ç¿ëÇÏÁö ¾Ê¾Æµµ Å¸ÀÔÀº ´ëÀÀÇÏµµ·Ï ÁØºñ.
+        // íŠ¹ìˆ˜ ì¹´ë“œ í’€ì„ ì•„ì§ ì‚¬ìš©í•˜ì§€ ì•Šì•„ë„ íƒ€ì…ì€ ëŒ€ì‘í•˜ë„ë¡ ì¤€ë¹„.
         if (data is SpecialCardData specialCard)
             return new SpecialCardInstance(specialCard);
 
-        // TargetCardData´Â ¾ÆÁ÷ ¾øÀ¸¹Ç·Î ¹ÌÁö¿ø Ä«µåÀÓÀ» ¸í½ÃÇÑ´Ù.
-        Debug.LogError($"Áö¿øÇÏÁö ¾Ê´Â Ä«µå µ¥ÀÌÅÍ: {data?.GetType().Name ?? "null"}");
+        // TargetCardDataëŠ” ì•„ì§ ì—†ìœ¼ë¯€ë¡œ ë¯¸ì§€ì› ì¹´ë“œì„ì„ ëª…ì‹œí•œë‹¤.
+        Debug.LogError($"ì§€ì›í•˜ì§€ ì•ŠëŠ” ì¹´ë“œ ë°ì´í„°: {data?.GetType().Name ?? "null"}");
         return null;
     }
 
@@ -135,7 +278,7 @@ public class CardManager : MonoBehaviour
 
         if (operators.Count == 0)
         {
-            Debug.LogError("Wild Ä«µå¿¡ Çã¿ëµÈ ¿¬»êÀÚ°¡ ¾ø½À´Ï´Ù.");
+            Debug.LogError("Wild ì¹´ë“œì— í—ˆìš©ëœ ì—°ì‚°ìê°€ ì—†ìŠµë‹ˆë‹¤.");
             return CardOperator.None;
         }
         return operators[Random.Range(0, operators.Count)];
@@ -154,7 +297,7 @@ public class CardManager : MonoBehaviour
                     int maxInt = Mathf.FloorToInt(max);
                     if (minInt > maxInt)
                     {
-                        Debug.LogError("Á¤¼ö ¹üÀ§°¡ ¿Ã¹Ù¸£Áö ¾Ê½À´Ï´Ù.");
+                        Debug.LogError("ì •ìˆ˜ ë²”ìœ„ê°€ ì˜¬ë°”ë¥´ì§€ ì•ŠìŠµë‹ˆë‹¤.");
                         return min;
                     }
                     return Random.Range(minInt, maxInt + 1);
@@ -166,7 +309,7 @@ public class CardManager : MonoBehaviour
                     int maxDecimal = Mathf.FloorToInt(max * 100f);
                     if (minDecimal > maxDecimal)
                     {
-                        Debug.LogError("¼Ò¼ö ¹üÀ§°¡ ¿Ã¹Ù¸£Áö ¾Ê½À´Ï´Ù.");
+                        Debug.LogError("ì†Œìˆ˜ ë²”ìœ„ê°€ ì˜¬ë°”ë¥´ì§€ ì•ŠìŠµë‹ˆë‹¤.");
                         return min;
                     }
                     return Random.Range(minDecimal, maxDecimal + 1) / 100f;
@@ -182,12 +325,12 @@ public class CardManager : MonoBehaviour
             return;
 
         CardInstance instance = selectedCards[index];
-        GameManager.Instance.uiManager.AddCard(instance);
+        AddCard(instance);
 
-        // ½ÇÁ¦ Ä«µå È¿°úÀÇ °è»ê Ã¥ÀÓÀº ÃßÈÄ ºĞ¸®ÇÒ ¿¹Á¤.
-        Debug.Log("¼±ÅÃÇÑ Ä«µå: " + instance.cardData.cardName);
+        // ì‹¤ì œ ì¹´ë“œ íš¨ê³¼ì˜ ê³„ì‚° ì±…ì„ì€ ì¶”í›„ ë¶„ë¦¬í•  ì˜ˆì •.
+        Debug.Log("ì„ íƒí•œ ì¹´ë“œ: " + instance.cardData.cardName);
         if (instance is NumberCardInstance number)
-            Debug.Log($"¿¬»êÀÚ: {number.cardOperator} / ¼ıÀÚ: {number.numberValue}");
+            Debug.Log($"ì—°ì‚°ì: {number.cardOperator} / ìˆ«ì: {number.numberValue}");
 
         GameManager.Instance.uiManager.CloseCardSelection();
     }
