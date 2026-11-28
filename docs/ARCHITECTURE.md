@@ -96,6 +96,28 @@ sequenceDiagram
 - 보상 선택 화면의 열기·닫기, 시간 정지·복구는 `UIManager`에 남긴다. 카드 획득의 실제 기록은 `CardManager.AddCard`가 수행한다.
 - `InventoryCardUI`, `CombinedCardUI`, `CombinedBlockUI`, `ScratchBlockGraphic`은 데이터를 복제하거나 카드 효과를 계산하지 않는다.
 
+### 합성 카드 UI 계층 개편 (PR #3 · 코드 제출, Unity 검증 전)
+
+현재 `master`에는 아직 이전 프리팹이 있고 아래 구조는 **PR #3 목표 상태**이다. 논리적인 카드 연결은 `CardInstance.parentCard` / `childCard`로만 유지하며 Unity Transform의 부모·자식 관계와 무관하다.
+
+```text
+CardContainer
+└── CombinedCard                   [CombinedCardUI, InventoryCardUI]
+    ├── Block 01                   [CombinedBlockUI]
+    │   ├── Icon
+    │   ├── CardName
+    │   └── Unlink Button
+    │       └── Text (TMP)
+    ├── Block 02                   [동일한 자식 구조]
+    └── Block 03                   [동일한 자식 구조]
+```
+
+- `CombinedCardUI`가 블록을 직접 형제로 생성하고, 카드 체인의 순서를 따라 겹침 위치를 배치한다. 기존 `BlockContainer`와 루트 `VerticalLayoutGroup`, `ContentSizeFitter`는 제거 대상이다.
+- `CombinedBlock.prefab`의 미사용 `Header`, `ChildSlot`, `BackGround`, 내부 `Canvas`를 제거한다. 실제 표시 요소만 유지한다.
+- 합성 카드 전체 드래그는 `InventoryCardUI`, 개별 블록 해제 버튼은 `CombinedBlockUI`가 담당한다. `CardManager`의 데이터 연결 로직은 변경하지 않는다.
+- **탐색 정책:** `FindObjectOfType`, `FindFirstObjectByType`, `FindAnyObjectByType`, `FindObjectsOfType` 등 전역 객체 자동 탐색은 새 코드에서 사용하지 않는다. Inspector 직렬화 참조 또는 명시적 의존성 전달을 사용한다.
+- Unity 실행·레이아웃·버튼 Raycast 검증 전에는 PR #3을 완료로 간주하지 않는다.
+
 ## 6. MapManager와 GameManager — 다른 매니저와의 관계
 
 - `GameManager`는 플레이어 등록과 최상위 매니저 참조를 제공한다. 개별 카드 연산·방 지형 로직은 포함하지 않는다.
