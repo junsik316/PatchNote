@@ -146,4 +146,4 @@ SampleScene
 - `TryConnect`, `GenerateRoom`, `ClearStage`처럼 상태를 실제로 변경하는 책임은 한곳에 둔다.
 - 실제 코드와 목표 설계를 구분하고, 구현 여부는 [`REFACTOR_ROADMAP.md`](REFACTOR_ROADMAP.md) 체크리스트로 추적한다.
 - Git 커밋 제목은 **`[작업 종류] 세부 내용`** 형식을 따른다. 예: `[Update Docs] 리팩터링 체크리스트와 매니저 책임 정리`.
-- 원격 저장소 수정이나 PR 작성은 기본 작업 방식이 아니다. 변경 파일을 로컬에서 검토·테스트한 뒤 사용자가 직접 Commit·Push한다.
+- **문서**는 `master`에 직접 수정하고 **게임 코드·씬·프리팹**은 별도 PR을 생성해 검토한다. 코드 PR은 Unity에서 검증하기 전까지 병합하지 않는다.
