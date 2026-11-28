@@ -335,10 +335,14 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 5793089163627499902, guid: 5c5f76ee0acbbd047a032f971944fb50, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6662890210480972061, guid: 5c5f76ee0acbbd047a032f971944fb50, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1608367594}
   m_SourcePrefab: {fileID: 100100000, guid: 5c5f76ee0acbbd047a032f971944fb50, type: 3}
 --- !u!1 &417138287
 GameObject:
@@ -578,6 +582,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UIManager
   inventoryUI: {fileID: 1090911951}
   cardSelectionUI: {fileID: 1154214630}
+  inventory: []
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &491684551
 GameObject:
   m_ObjectHideFlags: 0
@@ -1999,6 +2007,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1526528249}
   m_CullTransparentMesh: 1
+--- !u!1 &1608367593 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6662890210480972061, guid: 5c5f76ee0acbbd047a032f971944fb50, type: 3}
+  m_PrefabInstance: {fileID: 241924174}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1608367594
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1608367593}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.VerticalLayoutGroup
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 0
+  m_Spacing: 0
+  m_ChildForceExpandWidth: 1
+  m_ChildForceExpandHeight: 1
+  m_ChildControlWidth: 0
+  m_ChildControlHeight: 0
+  m_ChildScaleWidth: 0
+  m_ChildScaleHeight: 0
+  m_ReverseArrangement: 0
 --- !u!1 &1663580593
 GameObject:
   m_ObjectHideFlags: 0

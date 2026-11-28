@@ -8,6 +8,7 @@ public class UIManager : MonoBehaviour
     public CardSelectionUI cardSelectionUI;
 
     [Header("인벤토리 데이터")]
+    [SerializeReference] //디버깅용 임시 직렬화 나중에 제거
     public List<CardInstance> inventory =
         new List<CardInstance>();
 

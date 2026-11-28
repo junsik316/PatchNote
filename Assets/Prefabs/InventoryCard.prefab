@@ -222,6 +222,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2309319944631597475}
   - component: {fileID: 307306598262534751}
+  - component: {fileID: 5749014869991452502}
   m_Layer: 5
   m_Name: InventoryCard
   m_TagString: Untagged
@@ -266,6 +267,14 @@ MonoBehaviour:
   cardImage: {fileID: 2594817343733104271}
   cardName: {fileID: 9146858427457277325}
   childContainer: {fileID: 2309319944631597475}
+--- !u!222 &5749014869991452502
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6478491613026287646}
+  m_CullTransparentMesh: 1
 --- !u!1 &7512938513845613665
 GameObject:
   m_ObjectHideFlags: 0
