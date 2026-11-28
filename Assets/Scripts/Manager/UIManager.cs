@@ -3,26 +3,50 @@ using UnityEngine;
 
 public class UIManager : MonoBehaviour
 {
-    [Header("UI ÄÄÆ÷³ÍÆ®")]
+    [Header("UI ì»´í¬ë„ŒíŠ¸")]
     public InventoryUI inventoryUI;
     public CardSelectionUI cardSelectionUI;
 
-    [Header("ÀÎº¥Åä¸® µ¥ÀÌÅÍ")]
-    [SerializeReference] //µğ¹ö±ë¿ë ÀÓ½Ã Á÷·ÄÈ­ ³ªÁß¿¡ Á¦°Å
-    public List<CardInstance> inventory =
-        new List<CardInstance>();
+    // The persistent CardManager owns the cards.
+    private CardManager subscribedManager;
 
     private float previousTimeScale;
 
-    // ÀÎº¥Åä¸®¿¡ Ä«µå Ãß°¡
+    private void OnEnable() { BindCardManager(); }
+    private void Start()
+    {
+        if (GameManager.Instance != null)
+            GameManager.Instance.uiManager = this;
+        BindCardManager();
+    }
+    private void OnDisable()
+    {
+        if (subscribedManager != null)
+            subscribedManager.InventoryChanged -= OnInventoryChanged;
+        subscribedManager = null;
+    }
+    private void BindCardManager()
+    {
+        CardManager manager = CardManager.Instance;
+        if (subscribedManager == manager) return;
+        if (subscribedManager != null)
+            subscribedManager.InventoryChanged -= OnInventoryChanged;
+        subscribedManager = manager;
+        if (subscribedManager != null)
+            subscribedManager.InventoryChanged += OnInventoryChanged;
+    }
+    private void OnInventoryChanged()
+    {
+        if (subscribedManager != null && inventoryUI != null && inventoryUI.IsOpen)
+            inventoryUI.OpenInventory(subscribedManager.Inventory);
+    }
+
+    // ì¸ë²¤í† ë¦¬ì— ì¹´ë“œ ì¶”ê°€
     public void AddCard(CardInstance instance)
     {
-        inventory.Add(instance);
-
-        RecalculatePhysicsCoefficients();
-
-        if (inventoryUI.IsOpen)
-            inventoryUI.OpenInventory(inventory);
+        BindCardManager();
+        if (subscribedManager != null)
+            subscribedManager.AddCard(instance);
     }
 
     public void ToggleInventory()
@@ -42,10 +66,11 @@ public class UIManager : MonoBehaviour
 
     private void OpenInventory()
     {
+        BindCardManager();
+        if (subscribedManager == null) return;
         previousTimeScale = Time.timeScale;
         Time.timeScale = 0f;
-
-        inventoryUI.OpenInventory(inventory);
+        inventoryUI.OpenInventory(subscribedManager.Inventory);
     }
 
     private void CloseInventory()
@@ -70,18 +95,9 @@ public class UIManager : MonoBehaviour
 
     public void RecalculatePhysicsCoefficients()
     {
-        GameManager gameManager = GameManager.Instance;
-
-        if (gameManager == null)
-            return;
-
-        PlayerPhysicsEffects physics =
-            gameManager.PlayerPhysics;
-
-        if (physics == null)
-            return;
-
-        physics.Recalculate(inventory);
+        BindCardManager();
+        if (subscribedManager != null)
+            subscribedManager.RefreshEffects(EffectTarget.Player);
     }
 
 }
