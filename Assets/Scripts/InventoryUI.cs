@@ -11,18 +11,17 @@ public class InventoryUI : MonoBehaviour
     public Transform cardContainer;
     public RectTransform dragLayer;
 
-    [Header("조합 관리")]
-    public CardCombinationManager combinationManager;
+    // CardManager is the sole entry point for connecting cards.
 
     private readonly List<InventoryCardUI> displayedCards =
         new List<InventoryCardUI>();
-    private List<CardInstance> inventoryData;
+    private IReadOnlyList<CardInstance> inventoryData;
     private bool needsRefresh;
 
     public InventoryCardUI CurrentDraggingCard { get; private set; }
     public bool IsOpen => inventoryPanel != null && inventoryPanel.activeSelf;
 
-    public void OpenInventory(List<CardInstance> inventory)
+    public void OpenInventory(IReadOnlyList<CardInstance> inventory)
     {
         if (inventoryPanel == null || cardContainer == null)
         {
@@ -178,14 +177,15 @@ public class InventoryUI : MonoBehaviour
     public void TryConnect(InventoryCardUI parentUI, InventoryCardUI childUI)
     {
         if (parentUI == null || childUI == null ||
-            parentUI == childUI || combinationManager == null)
+            parentUI == childUI || CardManager.Instance == null)
             return;
 
         CardInstance tail = parentUI.CardInstance;
         CardInstance childRoot = childUI.CardInstance;
         if (tail == null || childRoot == null ||
-            childRoot.parentCard != null || inventoryData == null ||
-            !inventoryData.Contains(tail) || !inventoryData.Contains(childRoot))
+            childRoot.parentCard != null ||
+            !CardManager.Instance.ContainsCard(tail) ||
+            !CardManager.Instance.ContainsCard(childRoot))
             return;
 
         var visited = new HashSet<CardInstance>();
@@ -199,37 +199,23 @@ public class InventoryUI : MonoBehaviour
             tail = tail.childCard;
         }
 
-        if (!combinationManager.TryConnect(tail, childRoot))
+        if (!CardManager.Instance.TryConnect(tail, childRoot))
         {
             Debug.Log("유효하지 않은 카드 조합입니다.");
             return;
         }
 
-        RecalculateEffects();
-        if (CurrentDraggingCard != null)
-            needsRefresh = true;
-        else
-            RefreshInventory();
+        // InventoryChanged is handled by UIManager; RefreshInventory
+        // automatically defers until the drag is completed.
     }
 
     public void DisconnectCard(CardInstance child)
     {
         if (child == null || child.parentCard == null ||
-            combinationManager == null)
+            CardManager.Instance == null)
             return;
 
-        combinationManager.Disconnect(child);
-        RecalculateEffects();
-        if (CurrentDraggingCard != null)
-            needsRefresh = true;
-        else
-            RefreshInventory();
+        CardManager.Instance.Disconnect(child);
     }
 
-    private void RecalculateEffects()
-    {
-        if (GameManager.Instance != null &&
-            GameManager.Instance.uiManager != null)
-            GameManager.Instance.uiManager.RecalculatePhysicsCoefficients();
-    }
 }

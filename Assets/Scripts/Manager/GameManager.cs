@@ -5,15 +5,15 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    [Header("°ÔÀÓ ¸Å´ÏÀú")]
+    [Header("ê²Œì„ ë§¤ë‹ˆì €")]
     public MapManager mapManager;
     public CardManager cardManager;
     public UIManager uiManager;
 
-    // ÇÃ·¹ÀÌ¾îÀÇ À¯ÀÏÇÑ ÂüÁ¶
+    // í”Œë ˆì´ì–´ì˜ ìœ ì¼í•œ ì°¸ì¡°
     public Playercontroller Player { get; private set; }
 
-    // ÇÃ·¹ÀÌ¾îÀÇ ¹°¸® È¿°ú ÄÄÆ÷³ÍÆ®
+    // í”Œë ˆì´ì–´ì˜ ë¬¼ë¦¬ íš¨ê³¼ ì»´í¬ë„ŒíŠ¸
     public PlayerPhysicsEffects PlayerPhysics
     {
         get
@@ -35,13 +35,15 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        if (CardManager.Instance != null)
+            cardManager = CardManager.Instance;
     }
 
     public void RegisterPlayer(Playercontroller player)
     {
         if (player == null)
         {
-            Debug.LogError("ÇÃ·¹ÀÌ¾î µî·Ï ½ÇÆĞ");
+            Debug.LogError("í”Œë ˆì´ì–´ ë“±ë¡ ì‹¤íŒ¨");
             return;
         }
 

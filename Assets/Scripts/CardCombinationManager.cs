@@ -19,7 +19,7 @@ public class CardCombinationRule
 
 public class CardCombinationManager : MonoBehaviour
 {
-    [Header("Çã¿ëµÇ´Â Ä«µå Á¶ÇÕ")]
+    [Header("í—ˆìš©ë˜ëŠ” ì¹´ë“œ ì¡°í•©")]
     public List<CardCombinationRule> validRules =
         new List<CardCombinationRule>()
         {
@@ -39,7 +39,7 @@ public class CardCombinationManager : MonoBehaviour
             )
         };
 
-    // Ä«µå ¿¬°á
+    // ì¹´ë“œ ì—°ê²°
     public bool TryConnect(
         CardInstance parent,
         CardInstance child)
@@ -47,39 +47,43 @@ public class CardCombinationManager : MonoBehaviour
         if (parent == null || child == null)
             return false;
 
-        // ÀÚ±â ÀÚ½Å°ú ¿¬°áÇÒ ¼ö ¾øÀ½
+        // ìê¸° ìì‹ ê³¼ ì—°ê²°í•  ìˆ˜ ì—†ìŒ
         if (parent == child)
             return false;
 
-        // ºÎ¸ğ¿¡°Ô ÀÌ¹Ì ÀÚ½ÄÀÌ ÀÖÀ½
+        // ë¶€ëª¨ì—ê²Œ ì´ë¯¸ ìì‹ì´ ìˆìŒ
         if (parent.childCard != null)
             return false;
 
-        // ÀÚ½Ä¿¡°Ô ÀÌ¹Ì ºÎ¸ğ°¡ ÀÖÀ½
+        // ìì‹ì—ê²Œ ì´ë¯¸ ë¶€ëª¨ê°€ ìˆìŒ
         if (child.parentCard != null)
             return false;
 
-        // ¼øÈ¯ ¿¬°á ¹æÁö
+        // ìˆœí™˜ ì—°ê²° ë°©ì§€
         if (CreatesCycle(parent, child))
             return false;
 
-        // Á¶ÇÕ ¿É¼Ç °Ë»ç
+        // ì¡°í•© ì˜µì…˜ ê²€ì‚¬
         if (!IsValidCombination(parent, child))
             return false;
 
         parent.childCard = child;
         child.parentCard = parent;
 
-        Debug.Log("Ä«µå ¿¬°á ¼º°ø");
+        Debug.Log("ì¹´ë“œ ì—°ê²° ì„±ê³µ");
 
         return true;
     }
 
-    // À¯È¿ÇÑ Á¶ÇÕÀÎÁö °Ë»ç
+    // ìœ íš¨í•œ ì¡°í•©ì¸ì§€ ê²€ì‚¬
     private bool IsValidCombination(
         CardInstance parent,
         CardInstance child)
     {
+        // Keep Target -> Physics supported with older scene-serialized rule lists.
+        if (parent is TargetCardInstance && child is PhysicsCardInstance)
+            return true;
+
         foreach (CardCombinationRule rule in validRules)
         {
             if (parent.HasOption(rule.parentOption) &&
@@ -92,7 +96,7 @@ public class CardCombinationManager : MonoBehaviour
         return false;
     }
 
-    // ¼øÈ¯ ±¸Á¶ °Ë»ç
+    // ìˆœí™˜ êµ¬ì¡° ê²€ì‚¬
     private bool CreatesCycle(
         CardInstance parent,
         CardInstance child)
@@ -110,7 +114,7 @@ public class CardCombinationManager : MonoBehaviour
         return false;
     }
 
-    // Ä«µå ¿¬°á ÇØÁ¦
+    // ì¹´ë“œ ì—°ê²° í•´ì œ
     public void Disconnect(CardInstance child)
     {
         if (child == null || child.parentCard == null)
@@ -123,6 +127,6 @@ public class CardCombinationManager : MonoBehaviour
 
         child.parentCard = null;
 
-        Debug.Log("Ä«µå ¿¬°á ÇØÁ¦");
+        Debug.Log("ì¹´ë“œ ì—°ê²° í•´ì œ");
     }
 }

@@ -1,16 +1,13 @@
-using System.Collections.Generic;
 using UnityEngine;
 
-// ÀÌ¹ø ´Ü°è¿¡¼­´Â ±âÁ¸ ÇÃ·¹ÀÌ¾î ¹°¸® È¿°ú¸¦ À¯ÁöÇÏ±â À§ÇØ
-// CardInstance Á¢±Ù ºÎºÐ¸¸ ÆÄ»ý Å¸ÀÔ ±â¹ÝÀ¸·Î º¯°æÇÑ´Ù.
-// °è»ê±â/Àû¿ë±â ºÐ¸®´Â ´ÙÀ½ ¸®ÆÑÅÍ¸µ ´Ü°è¿¡¼­ ¼öÇàÇÑ´Ù.
-public class PlayerPhysicsEffects : MonoBehaviour
+// Player keeps and applies its own physics values; cards are evaluated by CardManager.
+public class PlayerPhysicsEffects : MonoBehaviour, ICardEffectReceiver
 {
-    [Header("ÇÃ·¹ÀÌ¾î ¹°¸® ÄÄÆ÷³ÍÆ®")]
+    [Header("í”Œë ˆì´ì–´ ë¬¼ë¦¬ ì»´í¬ë„ŒíŠ¸")]
     public Rigidbody2D rb;
     public Collider2D bodyCollider;
 
-    [Header("±âº» ÀÌµ¿ °è¼ö")]
+    [Header("ê¸°ë³¸ ì´ë™ ê³„ìˆ˜")]
     public float baseMoveSpeed = 5f;
     public float baseJumpForce = 10f;
 
@@ -21,6 +18,9 @@ public class PlayerPhysicsEffects : MonoBehaviour
     private float baseFriction;
     private float baseBounciness;
     private PhysicsMaterial2D runtimeMaterial;
+    private CardManager registeredManager;
+
+    public EffectTarget Target => EffectTarget.Player;
 
     private void Awake()
     {
@@ -31,7 +31,7 @@ public class PlayerPhysicsEffects : MonoBehaviour
 
         if (rb == null)
         {
-            Debug.LogError("Rigidbody2D°¡ ¾ø½À´Ï´Ù.", this);
+            Debug.LogError("Rigidbody2Dê°€ ì—†ìŠµë‹ˆë‹¤.", this);
             enabled = false;
             return;
         }
@@ -62,119 +62,58 @@ public class PlayerPhysicsEffects : MonoBehaviour
 
     private void Start()
     {
-        if (GameManager.Instance != null &&
-            GameManager.Instance.uiManager != null)
-        {
-            Recalculate(GameManager.Instance.uiManager.inventory);
-        }
+        RegisterIfAvailable();
+        if (registeredManager == null)
+            RefreshCardEffects(null);
     }
 
-    public void Recalculate(List<CardInstance> inventory)
+    private void OnEnable()
     {
-        Dictionary<PhysicsType, float> values =
-            new Dictionary<PhysicsType, float>()
-            {
-                { PhysicsType.MoveSpeed, baseMoveSpeed },
-                { PhysicsType.JumpForce, baseJumpForce },
-                { PhysicsType.GravityScale, baseGravityScale },
-                { PhysicsType.Friction, baseFriction },
-                { PhysicsType.Bounciness, baseBounciness }
-            };
+        if (rb != null)
+            RegisterIfAvailable();
+    }
 
-        if (inventory != null)
-        {
-            foreach (CardInstance root in inventory)
-            {
-                if (root == null || root.parentCard != null)
-                    continue;
+    private void RegisterIfAvailable()
+    {
+        CardManager manager = CardManager.Instance;
+        if (manager == null || manager == registeredManager) return;
+        if (registeredManager != null)
+            registeredManager.UnregisterReceiver(this);
+        registeredManager = manager;
+        manager.RegisterReceiver(this);
+    }
 
-                // ÀÌÀüÀÇ ¹®ÀÚ¿­ physicsType°ú CardType ÇÊµå ´ë½Å
-                // ±¸Ã¼ Å¸ÀÔ¿¡ ÀúÀåµÈ enum °ªÀ» Á÷Á¢ »ç¿ëÇÑ´Ù.
-                if (!(root is PhysicsCardInstance physicsCard))
-                    continue;
+    private void OnDisable()
+    {
+        if (registeredManager != null)
+            registeredManager.UnregisterReceiver(this);
+        registeredManager = null;
+    }
 
-                PhysicsType target = physicsCard.physicsType;
-                if (!values.ContainsKey(target))
-                    continue;
+    // Initial registration and later card changes share the same refresh path.
+    // Base values remain on the player and are never overwritten by cards.
+    public void RefreshCardEffects(CardManager manager)
+    {
+        if (rb == null) return;
 
-                values[target] = CalculateChain(root, values[target]);
-            }
-        }
-
-        MoveSpeed = Mathf.Max(0f, values[PhysicsType.MoveSpeed]);
-        JumpForce = Mathf.Max(0f, values[PhysicsType.JumpForce]);
-        rb.gravityScale = values[PhysicsType.GravityScale];
+        MoveSpeed = Mathf.Max(0f, Modified(manager, PhysicsType.MoveSpeed, baseMoveSpeed));
+        JumpForce = Mathf.Max(0f, Modified(manager, PhysicsType.JumpForce, baseJumpForce));
+        rb.gravityScale = Modified(manager, PhysicsType.GravityScale, baseGravityScale);
 
         if (runtimeMaterial != null)
         {
-            runtimeMaterial.friction = Mathf.Clamp01(values[PhysicsType.Friction]);
-            runtimeMaterial.bounciness = Mathf.Clamp01(values[PhysicsType.Bounciness]);
+            runtimeMaterial.friction = Mathf.Clamp01(
+                Modified(manager, PhysicsType.Friction, baseFriction));
+            runtimeMaterial.bounciness = Mathf.Clamp01(
+                Modified(manager, PhysicsType.Bounciness, baseBounciness));
         }
-
-        Debug.Log(
-            $"¹°¸® °è¼ö °»½Å: Speed={MoveSpeed}, " +
-            $"Jump={JumpForce}, Gravity={rb.gravityScale}"
-        );
     }
 
-    private float CalculateChain(CardInstance root, float initialValue)
+    private float Modified(CardManager manager, PhysicsType property, float baseValue)
     {
-        float result = initialValue;
-        HashSet<CardInstance> visited = new HashSet<CardInstance>();
-        visited.Add(root);
-        CardInstance current = root.childCard;
-
-        while (current != null)
-        {
-            if (!visited.Add(current))
-            {
-                Debug.LogWarning("Ä«µå ¿¬°á¿¡ ¼øÈ¯ÀÌ ÀÖ½À´Ï´Ù.");
-                break;
-            }
-
-            if (current is NumberCardInstance numberCard)
-                result = ApplyNumberCard(result, numberCard);
-
-            current = current.childCard;
-        }
-        return result;
-    }
-
-    private float ApplyNumberCard(float value, NumberCardInstance numberCard)
-    {
-        float number = numberCard.numberValue;
-        float result;
-
-        switch (numberCard.cardOperator)
-        {
-            case CardOperator.Multiply:
-                result = value * number;
-                break;
-            case CardOperator.Divide:
-                if (Mathf.Approximately(number, 0f))
-                {
-                    Debug.LogWarning("0À¸·Î ³ª´­ ¼ö ¾ø½À´Ï´Ù.");
-                    return value;
-                }
-                result = value / number;
-                break;
-            case CardOperator.Add:
-                result = value + number;
-                break;
-            case CardOperator.Subtract:
-                result = value - number;
-                break;
-            default:
-                Debug.LogWarning("Áö¿øÇÏÁö ¾Ê´Â ¿¬»êÀÚ: " + numberCard.cardOperator);
-                return value;
-        }
-
-        if (float.IsNaN(result) || float.IsInfinity(result))
-        {
-            Debug.LogWarning("À¯È¿ÇÏÁö ¾ÊÀº ¹°¸® °è»ê °á°úÀÔ´Ï´Ù.");
-            return value;
-        }
-        return result;
+        return manager != null
+            ? manager.GetModifiedPhysicsValue(Target, property, baseValue)
+            : baseValue;
     }
 
     private void OnDestroy()

@@ -9,25 +9,25 @@ public class MapManager : MonoBehaviour
 
     public MapTree.Node currentNode;
 
-    [Header("¸Ê °ü¸®")]
+    [Header("ë§µ ê´€ë¦¬")]
     public MapTree mapTree;
     public RoomMaker roomMaker;
     public MapMaker mapMaker;
     public MiniMap miniMap;
     public CardManager cardManager;
 
-    [Header("Àû °ü¸®")]
+    [Header("ì  ê´€ë¦¬")]
     public RoomEnemySpawner enemySpawner;
 
-    // ¹æº° µ¥ÀÌÅÍ ÀúÀå
+    // ë°©ë³„ ë°ì´í„° ì €ì¥
     private Dictionary<MapTree.Node, RoomData> roomDataDictionary =
         new Dictionary<MapTree.Node, RoomData>();
 
-    [Header("½ºÅ×ÀÌÁö »óÅÂ")]
+    [Header("ìŠ¤í…Œì´ì§€ ìƒíƒœ")]
     public bool isStageCleared = false;
     public bool isStageChecking = false;
 
-    [Header("ÇÃ·¹ÀÌ¾î °ü¸®")]
+    [Header("í”Œë ˆì´ì–´ ê´€ë¦¬")]
     public GameObject playerPrefab;
 
     private void Awake()
@@ -41,6 +41,10 @@ public class MapManager : MonoBehaviour
 
     private void Start()
     {
+        if (CardManager.Instance != null)
+            cardManager = CardManager.Instance;
+        if (GameManager.Instance != null)
+            GameManager.Instance.mapManager = this;
         InitializeMap();
     }
 
@@ -60,8 +64,8 @@ public class MapManager : MonoBehaviour
         mapNodes = mapTree.GetRooms();
         currentNode = mapTree.GetStartNode();
 
-        // ½ÃÀÛ ¹æÀº Àû ¾øÀÌ ÀÌµ¿ÇÒ ¼ö ÀÖµµ·Ï
-        // ÃÖÃÊºÎÅÍ Å¬¸®¾î »óÅÂ·Î Ã³¸®
+        // ì‹œì‘ ë°©ì€ ì  ì—†ì´ ì´ë™í•  ìˆ˜ ìˆë„ë¡
+        // ìµœì´ˆë¶€í„° í´ë¦¬ì–´ ìƒíƒœë¡œ ì²˜ë¦¬
         PrepareRoomState();
 
         Vector3 startPos =
@@ -84,7 +88,7 @@ public class MapManager : MonoBehaviour
             spawnedPlayer.cardManager = cardManager;
         }
 
-        // ´©¶ôµÇ¾ú´ø ÃÊ±âÈ­ º¹¿ø
+        // ëˆ„ë½ë˜ì—ˆë˜ ì´ˆê¸°í™” ë³µì›
         SpawnCurrentRoomEnemies();
 
         if (mapMaker != null)
@@ -97,12 +101,12 @@ public class MapManager : MonoBehaviour
 
     }
 
-    // ¹æ¿¡ µé¾î°¥ ¶§ Å¬¸®¾î ±â·Ï º¹¿ø
+    // ë°©ì— ë“¤ì–´ê°ˆ ë•Œ í´ë¦¬ì–´ ê¸°ë¡ ë³µì›
     private void PrepareRoomState()
     {
         RoomData data = GetRoomData(currentNode);
 
-        // ½ÃÀÛ ¹æÀº º¸»ó ¾øÀÌ ¹®À» ¿­¾î µÒ
+        // ì‹œì‘ ë°©ì€ ë³´ìƒ ì—†ì´ ë¬¸ì„ ì—´ì–´ ë‘ 
         if (currentNode == mapTree.GetStartNode())
             data.isCleared = true;
 
@@ -120,16 +124,16 @@ public class MapManager : MonoBehaviour
         if (node == null)
             return;
 
-        // ÀÌÀü ¹æÀÇ Àû Á¦°Å
+        // ì´ì „ ë°©ì˜ ì  ì œê±°
         if (enemySpawner != null)
             enemySpawner.ClearEnemies();
 
         currentNode = node;
 
-        // ÇØ´ç ¹æÀÇ Å¬¸®¾î ¿©ºÎ º¹¿ø
+        // í•´ë‹¹ ë°©ì˜ í´ë¦¬ì–´ ì—¬ë¶€ ë³µì›
         PrepareRoomState();
 
-        // ±âÁ¸ ¹æ ±¸Á¶ »ı¼º ¶Ç´Â ºÒ·¯¿À±â
+        // ê¸°ì¡´ ë°© êµ¬ì¡° ìƒì„± ë˜ëŠ” ë¶ˆëŸ¬ì˜¤ê¸°
         Vector3 spawnPos =
             roomMaker.GenerateRoom(currentNode);
 
@@ -140,7 +144,7 @@ public class MapManager : MonoBehaviour
             player.transform.position = spawnPos;
         }
 
-        // ¹ÌÅ¬¸®¾î ¹æ¿¡¼­¸¸ Àû »ı¼º
+        // ë¯¸í´ë¦¬ì–´ ë°©ì—ì„œë§Œ ì  ìƒì„±
         SpawnCurrentRoomEnemies();
 
         if (miniMap != null)
@@ -151,7 +155,7 @@ public class MapManager : MonoBehaviour
 
     private void SpawnCurrentRoomEnemies()
     {
-        // ÀÌÀü¿¡ Å¬¸®¾îÇÑ ¹æÀº Àû »ı¼º X
+        // ì´ì „ì— í´ë¦¬ì–´í•œ ë°©ì€ ì  ìƒì„± X
         if (isStageCleared)
             return;
 
@@ -159,7 +163,7 @@ public class MapManager : MonoBehaviour
 
         if (enemySpawner == null || player == null)
         {
-            Debug.LogWarning("Àû »ı¼º¿¡ ÇÊ¿äÇÑ ÂüÁ¶°¡ ¾ø½À´Ï´Ù.");
+            Debug.LogWarning("ì  ìƒì„±ì— í•„ìš”í•œ ì°¸ì¡°ê°€ ì—†ìŠµë‹ˆë‹¤.");
             return;
         }
 
@@ -179,7 +183,7 @@ public class MapManager : MonoBehaviour
         }
         else
         {
-            // ÀûÀÌ ¾ø´Â ¹æÀº ¹Ù·Î Å¬¸®¾î
+            // ì ì´ ì—†ëŠ” ë°©ì€ ë°”ë¡œ í´ë¦¬ì–´
             ClearStage();
         }
     }
@@ -197,7 +201,7 @@ public class MapManager : MonoBehaviour
         return roomDataDictionary[node];
     }
 
-    // ¸¶Áö¸· Àû »ç¸Á ÀÌº¥Æ®
+    // ë§ˆì§€ë§‰ ì  ì‚¬ë§ ì´ë²¤íŠ¸
     private void OnAllEnemiesDefeated()
     {
         if (!isStageChecking || isStageCleared)
@@ -213,24 +217,24 @@ public class MapManager : MonoBehaviour
 
         RoomData data = GetRoomData(currentNode);
 
-        // ÀÌ¹Ì Å¬¸®¾îµÈ ¹æÀÌ¸é Áßº¹ ½ÇÇà ¹æÁö
+        // ì´ë¯¸ í´ë¦¬ì–´ëœ ë°©ì´ë©´ ì¤‘ë³µ ì‹¤í–‰ ë°©ì§€
         if (data.isCleared)
             return;
 
-        // Å¬¸®¾î »óÅÂ ÀúÀå
+        // í´ë¦¬ì–´ ìƒíƒœ ì €ì¥
         data.isCleared = true;
 
         isStageCleared = true;
         isStageChecking = false;
 
         Debug.Log(
-            $"½ºÅ×ÀÌÁö Å¬¸®¾î: {currentNode.type}"
+            $"ìŠ¤í…Œì´ì§€ í´ë¦¬ì–´: {currentNode.type}"
         );
 
-        // ¹® °³¹æ
+        // ë¬¸ ê°œë°©
         OpenDoors();
 
-        // Ä«µå ¼±ÅÃ È­¸é Ç¥½Ã (ÃÖÃÊ 1È¸)
+        // ì¹´ë“œ ì„ íƒ í™”ë©´ í‘œì‹œ (ìµœì´ˆ 1íšŒ)
         if (cardManager != null)
             cardManager.ShowCardSelection(currentNode);
     }
@@ -242,7 +246,7 @@ public class MapManager : MonoBehaviour
 
     private void Update()
     {
-        // Å×½ºÆ®: CÅ°¸¦ ´©¸£¸é ÇöÀç ¹æÀÇ Àû ÀüºÎ Ã³Ä¡
+        // í…ŒìŠ¤íŠ¸: Cí‚¤ë¥¼ ëˆ„ë¥´ë©´ í˜„ì¬ ë°©ì˜ ì  ì „ë¶€ ì²˜ì¹˜
         if (Input.GetKeyDown(KeyCode.C) &&
             isStageChecking &&
             !isStageCleared)
